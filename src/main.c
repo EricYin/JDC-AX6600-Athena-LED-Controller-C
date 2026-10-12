@@ -1,0 +1,85 @@
+#include "app.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+static void usage(FILE *out)
+{
+    fputs(
+"athena-led-c — JDCloud AX6600 Athena front LED matrix controller\n"
+"\n"
+"Usage: athena-led-c [OPTIONS]\n"
+"\n"
+"Options:\n"
+"  --sim, --test             run terminal simulator (27x5, ■/·)\n"
+"  --no-clear                simulator: do not clear terminal each frame\n"
+"  --page-secs N             seconds per page (default 5)\n"
+"  --scroll-ms N             scroll frame interval in ms (default 128)\n"
+"  --poll-ms N               system sampling interval in ms (default 250)\n"
+"  --brightness 0..7         panel brightness (default 5)\n"
+"  --net-interface NAME      interface for throughput (default br-lan)\n"
+"  --sun-coords LAT,LON      sunrise/sunset location (default Beijing)\n"
+"  --self-test               run built-in tests and exit\n"
+"  -h, --help                show this help\n",
+    out);
+}
+
+int app_parse_args(app_args_t *a, int argc, char **argv)
+{
+    memset(a, 0, sizeof(*a));
+    a->page_secs = 5;
+    a->scroll_ms = 128;
+    a->poll_ms = 250;
+    a->brightness = 5;
+    a->net_if = "br-lan";
+    a->sun_coords = "";
+
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        if (strcmp(arg, "--sim") == 0 || strcmp(arg, "--test") == 0) {
+            a->sim = true;
+        } else if (strcmp(arg, "--no-clear") == 0) {
+            a->no_clear = true;
+        } else if (strcmp(arg, "--self-test") == 0) {
+            a->self_test = true;
+        } else if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+            usage(stdout);
+            return 1; /* help requested: print and stop */
+        } else if (strcmp(arg, "--page-secs") == 0 && i + 1 < argc) {
+            a->page_secs = (unsigned)strtoul(argv[++i], NULL, 10);
+        } else if (strcmp(arg, "--scroll-ms") == 0 && i + 1 < argc) {
+            a->scroll_ms = (unsigned)strtoul(argv[++i], NULL, 10);
+        } else if (strcmp(arg, "--poll-ms") == 0 && i + 1 < argc) {
+            a->poll_ms = (unsigned)strtoul(argv[++i], NULL, 10);
+        } else if (strcmp(arg, "--brightness") == 0 && i + 1 < argc) {
+            a->brightness = (uint8_t)(strtoul(argv[++i], NULL, 10) & 0x07);
+        } else if (strcmp(arg, "--net-interface") == 0 && i + 1 < argc) {
+            a->net_if = argv[++i];
+        } else if (strcmp(arg, "--sun-coords") == 0 && i + 1 < argc) {
+            a->sun_coords = argv[++i];
+        } else {
+            fprintf(stderr, "Unknown option: %s\n", arg);
+            usage(stderr);
+            return -1;
+        }
+    }
+
+    if (a->page_secs == 0) a->page_secs = 5;
+    if (a->scroll_ms == 0) a->scroll_ms = 128;
+    if (a->poll_ms == 0) a->poll_ms = 250;
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    app_args_t args;
+    int rc = app_parse_args(&args, argc, argv);
+    if (rc != 0)
+        return rc < 0 ? 2 : 0;
+
+    if (args.self_test)
+        return app_self_test();
+
+    return app_run(&args);
+}
