@@ -19,7 +19,7 @@ typedef struct {
     long long press_start_ns;
     long long release_ns;    /* for double-click window */
     bool awaiting_double;
-    bool long_fired;
+    bool gesture_done;      /* current press already produced an action */
 } button_t;
 
 /* Try cdev line-event first, then sysfs input fallback. */

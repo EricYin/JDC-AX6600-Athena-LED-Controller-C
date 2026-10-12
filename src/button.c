@@ -13,6 +13,7 @@
 #include "button.h"
 
 #include <fcntl.h>
+#include <errno.h>
 #include <poll.h>
 #include <stdio.h>
 #include <string.h>
@@ -24,7 +25,6 @@
 
 #define LONG_PRESS_NS   (2LL * 1000000000LL)
 #define DOUBLECLICK_NS  (350LL * 1000000LL)
-#define SYSFS_POLL_NS   (100LL * 1000000LL)
 
 static long long now_ns(void)
 {
@@ -39,17 +39,19 @@ static bool sysfs_export_input(unsigned pin)
     if (fd < 0) return false;
     char buf[32];
     int len = snprintf(buf, sizeof(buf), "%u", pin);
-    bool ok = write(fd, buf, (size_t)len) == len;
+    ssize_t n = write(fd, buf, (size_t)len);
+    int saved = errno;
     close(fd);
-    if (!ok) return false;
+    /* EBUSY: pin already exported (e.g. procd restarted the daemon) - OK. */
+    if (n != len && saved != EBUSY) return false;
 
     char path[96];
     snprintf(path, sizeof(path), "/sys/class/gpio/gpio%u/direction", pin);
     fd = open(path, O_WRONLY | O_CLOEXEC);
     if (fd < 0) return false;
-    ok = write(fd, "in", 2) == 2;
+    bool dir_ok = write(fd, "in", 2) == 2;
     close(fd);
-    return ok;
+    return dir_ok;
 }
 
 bool button_init(button_t *b, unsigned gpio_pin)
@@ -80,6 +82,9 @@ bool button_init(button_t *b, unsigned gpio_pin)
 
             if (ioctl(fd, GPIO_GET_LINEEVENT_IOCTL, &req) == 0) {
                 close(fd);
+                /* Non-blocking: the drain loop below reads until EAGAIN. */
+                int flags = fcntl(req.fd, F_GETFL);
+                fcntl(req.fd, F_SETFL, flags | O_NONBLOCK);
                 b->fd = req.fd;
                 return true;
             }
@@ -95,82 +100,86 @@ bool button_init(button_t *b, unsigned gpio_pin)
     return b->sysfs_value_fd >= 0;
 }
 
-static void on_edge(button_t *b, bool pressed_now)
+/*
+ * Edge-driven gesture state machine.
+ * "gesture_done" marks that the current press already produced an action
+ * (double click fires on the second press edge, long press fires while
+ * held), so the matching release must not be reclassified as SHORT.
+ */
+static void on_edge(button_t *b, bool pressed_now, button_action_t *out)
 {
     long long now = now_ns();
 
     if (pressed_now) {
-        /* press edge */
         if (b->awaiting_double && now - b->release_ns < DOUBLECLICK_NS) {
+            /* second click inside the window: fire DOUBLE immediately */
             b->awaiting_double = false;
-            b->long_fired = true; /* consume gesture, handled by caller */
-            b->pressed = true;
-            b->press_start_ns = now;
-            return;
+            b->gesture_done = true;
+            *out = BUTTON_DOUBLE;
+        } else {
+            b->gesture_done = false;
         }
         b->pressed = true;
         b->press_start_ns = now;
-        b->long_fired = false;
     } else {
-        /* release edge */
         if (!b->pressed) return;
         b->pressed = false;
-        if (b->long_fired) return; /* already fired as long press */
+        if (b->gesture_done) return; /* DOUBLE/LONG already delivered */
         b->release_ns = now;
-        b->awaiting_double = true;
+        b->awaiting_double = true;   /* may still become a double click */
     }
 }
 
 static button_action_t classify(button_t *b)
 {
     long long now = now_ns();
-    button_action_t act = BUTTON_NONE;
 
-    /* long press fires while held (no need to wait for release) */
-    if (b->pressed && !b->long_fired && now - b->press_start_ns >= LONG_PRESS_NS) {
-        b->long_fired = true;
-        act = BUTTON_LONG;
+    /* long press fires while still held (no release wait needed) */
+    if (b->pressed && !b->gesture_done &&
+        now - b->press_start_ns >= LONG_PRESS_NS) {
+        b->gesture_done = true;
+        return BUTTON_LONG;
     }
-    /* double-click window expired -> single short press */
+    /* double-click window expired -> it was a single short press */
     if (b->awaiting_double && now - b->release_ns >= DOUBLECLICK_NS) {
         b->awaiting_double = false;
-        act = BUTTON_SHORT;
+        return BUTTON_SHORT;
     }
-    return act;
+    return BUTTON_NONE;
 }
 
 button_action_t button_poll(button_t *b, int timeout_ms)
 {
-    /* cdev: edge events via poll(), essentially zero CPU when idle */
+    button_action_t act = BUTTON_NONE;
+
+    /* cdev: edge events via poll(); zero CPU while the key is idle */
     if (b->fd >= 0) {
         struct pollfd pfd = { .fd = b->fd, .events = POLLIN };
         int rc = poll(&pfd, 1, timeout_ms);
         if (rc > 0 && (pfd.revents & POLLIN)) {
             struct gpioevent_data ev;
-            while (read(b->fd, &ev, sizeof(ev)) == (ssize_t)sizeof(ev)) {
-                if (ev.id == GPIOEVENT_EVENT_FALLING_EDGE) on_edge(b, true);
-                else if (ev.id == GPIOEVENT_EVENT_RISING_EDGE) on_edge(b, false);
+            ssize_t n;
+            while ((n = read(b->fd, &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
+                if (ev.id == GPIOEVENT_EVENT_FALLING_EDGE)
+                    on_edge(b, true, &act);
+                else if (ev.id == GPIOEVENT_EVENT_RISING_EDGE)
+                    on_edge(b, false, &act);
             }
         }
-        button_action_t act = classify(b);
-        if (act == BUTTON_SHORT && b->long_fired) {
-            /* double-click mark: reclassify */
-        }
-        if (b->long_fired && !b->pressed && act == BUTTON_NONE) {
-            b->long_fired = false;
-        }
+        if (act == BUTTON_NONE) act = classify(b);
         return act;
     }
 
-    /* sysfs fallback: poll value every call (main loop supplies cadence) */
+    /* sysfs fallback: read level each call; caller supplies cadence */
     if (b->sysfs_value_fd >= 0) {
         char c = '1';
         if (pread(b->sysfs_value_fd, &c, 1, 0) == 1) {
             bool pressed_now = (c == '0'); /* active-low button */
-            if (pressed_now != b->pressed) on_edge(b, pressed_now);
+            if (pressed_now != b->pressed) on_edge(b, pressed_now, &act);
         }
     }
-    return classify(b);
+    if (act == BUTTON_NONE) act = classify(b);
+    return act;
 }
 
 void button_close(button_t *b)

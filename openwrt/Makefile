@@ -34,11 +34,17 @@ Chinese lunar calendar, sunrise/sunset, CPU/memory/temperature and
 per-interface throughput. Terminal simulator included (--sim).
 endef
 
+# Repo root locator: works both when this directory is symlinked into
+# package/ (sources live in ../) and when the whole repo is used as the
+# package dir (sources live in ./). Note: ./Makefile cannot be probed
+# directly because it exists in BOTH layouts (here it is the package file).
+REPO_ROOT := $(if $(wildcard ./src),.,..)
+
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) ./src $(PKG_BUILD_DIR)/
-	$(CP) ./include $(PKG_BUILD_DIR)/
-	$(CP) ./Makefile $(PKG_BUILD_DIR)/
+	$(CP) $(REPO_ROOT)/src $(PKG_BUILD_DIR)/
+	$(CP) $(REPO_ROOT)/include $(PKG_BUILD_DIR)/
+	$(CP) $(REPO_ROOT)/Makefile $(PKG_BUILD_DIR)/
 endef
 
 define Build/Compile

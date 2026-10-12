@@ -38,6 +38,13 @@ static void install_signal_handlers(void)
 #define COLS_MAX 256
 #define FRAME_COLS 27
 
+static long long monotonic_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+}
+
 static void sleep_ms(unsigned ms)
 {
     struct timespec ts = {
@@ -164,33 +171,51 @@ static int run_hw(const app_args_t *a)
     uint8_t cols[COLS_MAX];
     uint8_t frame[FRAME_COLS];
 
+    long long last_tick = monotonic_ms();
+
     while (g_running) {
-        if (button_ok) {
-            switch (button_poll(&button, 0)) {
-            case BUTTON_SHORT:
-                page = (page + 1) % PAGE_COUNT;
-                page_elapsed_ms = 0;
-                scroll_pos = 0;
-                break;
-            case BUTTON_DOUBLE:
-                page = PAGE_TIME;
-                page_elapsed_ms = 0;
-                scroll_pos = 0;
-                break;
-            case BUTTON_LONG:
-                screen_on = !screen_on;
-                screen_power(&screen, screen_on,
-                             screen_on ? a->brightness : 0);
-                if (!screen_on) {
-                    uint8_t blank[FRAME_COLS] = {0};
-                    screen_write_frame(&screen, blank, 0);
-                }
-                break;
-            default:
-                break;
+        /*
+         * button_poll() doubles as the frame sleep: poll() blocks for the
+         * full refresh interval with zero CPU when idle, but wakes
+         * immediately on a key edge so page switches feel instant.
+         */
+        button_action_t act = BUTTON_NONE;
+        if (button_ok)
+            act = button_poll(&button, (int)a->poll_ms);
+        else
+            sleep_ms(a->poll_ms);
+
+        /* real elapsed time keeps page rotation exact even when an event
+         * wakes us early or a frame overruns */
+        long long now = monotonic_ms();
+        unsigned elapsed = (unsigned)(now - last_tick);
+        last_tick = now;
+        page_elapsed_ms += elapsed;
+
+        switch (act) {
+        case BUTTON_SHORT:
+            page = (page + 1) % PAGE_COUNT;
+            page_elapsed_ms = 0;
+            scroll_pos = 0;
+            break;
+        case BUTTON_DOUBLE:
+            page = PAGE_TIME;
+            page_elapsed_ms = 0;
+            scroll_pos = 0;
+            break;
+        case BUTTON_LONG:
+            screen_on = !screen_on;
+            screen_power(&screen, screen_on,
+                         screen_on ? a->brightness : 0);
+            if (!screen_on) {
+                uint8_t blank[FRAME_COLS] = {0};
+                screen_write_frame(&screen, blank, 0);
             }
+            break;
+        default:
+            break;
         }
-        if (!screen_on) { sleep_ms(a->poll_ms); continue; }
+        if (!screen_on) continue;
 
         monitor_poll(&mon);
         page_render(page, &mon, a->sun_coords, text, sizeof(text));
@@ -211,8 +236,6 @@ static int run_hw(const app_args_t *a)
             return 1;
         }
 
-        sleep_ms(a->poll_ms);
-        page_elapsed_ms += a->poll_ms;
         if (page_elapsed_ms >= a->page_secs * 1000u) {
             page = (page + 1) % PAGE_COUNT;
             page_elapsed_ms = 0;

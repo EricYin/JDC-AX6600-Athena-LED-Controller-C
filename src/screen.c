@@ -154,8 +154,12 @@ static int sysfs_export_pin(long num)
     char buf[32];
     int len = snprintf(buf, sizeof(buf), "%ld", num);
     ssize_t n = write(fd, buf, (size_t)len);
+    int saved = errno;
     close(fd);
-    return n == len ? 0 : -1;
+    /* EBUSY: already exported by a previous daemon instance - treat as OK,
+     * otherwise procd restarts would fail to re-initialize the panel. */
+    if (n != len && saved != EBUSY) return -1;
+    return 0;
 }
 
 static int sysfs_open_value(long num, int flags)
