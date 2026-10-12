@@ -130,6 +130,7 @@ static bool cdev_request_outputs(void)
     req.default_values[LINE_STB_R] = 1;
     req.default_values[LINE_CLK]   = 0;
     req.default_values[LINE_DIO]   = 0;
+    req.lines = 4;
     req.flags = GPIOHANDLE_REQUEST_OUTPUT;
     snprintf(req.consumer_label, sizeof(req.consumer_label), "athena-led-c");
 
@@ -222,7 +223,23 @@ static bool write_bit(uint8_t bit)
     return bus_set(LINE_CLK, 0) && bus_set(LINE_DIO, bit) && bus_set(LINE_CLK, 1);
 }
 
-static bool write_byte(uint8_t value, bool fill_six_low)
+/*
+ * TM1628A command bytes are standard 8-bit instructions: LSB first.
+ * (display mode 0x03, data mode 0x40, address 0xC0, power 0x88|br)
+ */
+static bool write_command_byte(uint8_t cmd)
+{
+    for (int i = 0; i < 8; i++) {
+        if (!write_bit((cmd >> i) & 1)) return false;
+    }
+    return true;
+}
+
+/*
+ * TM1628A display data is a special 11-bit format: 5 data bits followed by
+ * 6 address/pad bits (sent low). Only odd-indexed bytes carry the pad.
+ */
+static bool write_data_byte(uint8_t value, bool fill_six_low)
 {
     for (int i = 0; i < 5; i++) {
         if (!write_bit((value >> i) & 1)) return false;
@@ -238,9 +255,9 @@ static bool write_byte(uint8_t value, bool fill_six_low)
 static bool unit_write(int stb_line, uint8_t cmd, const uint8_t *values, size_t n)
 {
     if (!bus_set(stb_line, 0)) return false;
-    if (!write_byte(cmd, false)) return false;
+    if (!write_command_byte(cmd)) return false;
     for (size_t i = 0; i < n; i++) {
-        if (!write_byte(values[i], (i % 2) != 0)) return false;
+        if (!write_data_byte(values[i], (i % 2) != 0)) return false;
     }
     return bus_set(stb_line, 1);
 }

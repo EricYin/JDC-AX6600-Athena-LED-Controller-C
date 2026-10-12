@@ -48,9 +48,13 @@ void page_render(page_id_t page, const monitor_t *mon,
 
     switch (page) {
     case PAGE_TIME: {
-        /* Blinking colon: even seconds show ':', odd seconds show ';'
-         * (';' is a blank colon glyph in the font). Seconds are included. */
-        char colon = (tm.tm_sec % 2 == 0) ? ':' : ';';
+        /*
+         * Blinking colon, exactly 27 columns to fill the screen without
+         * scrolling: 6 digits x3 + 2 compact colons x1 + 7 gaps = 27.
+         * '^' is the 1-column compact colon; ' ' is the blank 1-column
+         * colon used for the blink-off phase.
+         */
+        char colon = (tm.tm_sec % 2 == 0) ? '^' : ' ';
         snprintf(buf, len, "%02d%c%02d^%02d",
                  tm.tm_hour, colon, tm.tm_min, tm.tm_sec);
         break;

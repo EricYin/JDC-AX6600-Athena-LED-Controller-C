@@ -1,5 +1,7 @@
 #include "app.h"
 
+#include "button.h"
+
 #include "font.h"
 #include "lunar.h"
 #include "monitor.h"
@@ -9,12 +11,30 @@
 #include "sun.h"
 
 #include <errno.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
 #define TEXT_MAX 64
+
+static volatile sig_atomic_t g_running = 1;
+
+static void on_signal(int sig)
+{
+    (void)sig;
+    g_running = 0;
+}
+
+static void install_signal_handlers(void)
+{
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = on_signal;
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+}
 #define COLS_MAX 256
 #define FRAME_COLS 27
 
@@ -62,6 +82,7 @@ static int run_sim(const app_args_t *a)
     page_id_t page = PAGE_TIME;
     unsigned page_elapsed_ms = 0;
     unsigned scroll_pos = 0;
+    bool screen_on = true;
     char text[TEXT_MAX];
     uint8_t cols[COLS_MAX];
     size_t ncols = 0;
@@ -74,6 +95,7 @@ static int run_sim(const app_args_t *a)
         if (c == 'q') break;
         if (c == 'n') { page = (page + 1) % PAGE_COUNT; page_elapsed_ms = 0; scroll_pos = 0; }
         if (c == 'p') { page = (page + PAGE_COUNT - 1) % PAGE_COUNT; page_elapsed_ms = 0; scroll_pos = 0; }
+        if (c == ' ') screen_on = !screen_on;
 
         monitor_poll(&mon);
         page_render(page, &mon, a->sun_coords, text, sizeof(text));
@@ -92,8 +114,11 @@ static int run_sim(const app_args_t *a)
             build_frame_centered(cols, ncols, frame);
         }
 
-        uint8_t status = indicator_status(&mon);
-        sim_print_frame(frame, status);
+        uint8_t status = screen_on ? indicator_status(&mon) : 0;
+        if (screen_on)
+            sim_print_frame(frame, status);
+        else
+            sim_print_frame((const uint8_t[FRAME_COLS]){0}, 0);
 
         sleep_ms(a->poll_ms);
         page_elapsed_ms += a->poll_ms;
@@ -110,6 +135,8 @@ static int run_sim(const app_args_t *a)
 
 static int run_hw(const app_args_t *a)
 {
+    install_signal_handlers();
+
     screen_t screen;
     if (!screen_init(&screen, GPIO_BACKEND_AUTO, 0)) {
         fprintf(stderr, "failed to init LED GPIO (cdev/sysfs)\n");
@@ -121,17 +148,50 @@ static int run_hw(const app_args_t *a)
         return 1;
     }
 
+    button_t button;
+    bool button_ok = button_init(&button, BUTTON_GPIO_PIN);
+    if (!button_ok)
+        fprintf(stderr, "warning: screen button unavailable\n");
+
     monitor_t mon;
     monitor_init(&mon, a->net_if);
 
     page_id_t page = PAGE_TIME;
     unsigned page_elapsed_ms = 0;
     unsigned scroll_pos = 0;
+    bool screen_on = true;
     char text[TEXT_MAX];
     uint8_t cols[COLS_MAX];
     uint8_t frame[FRAME_COLS];
 
-    for (;;) {
+    while (g_running) {
+        if (button_ok) {
+            switch (button_poll(&button, 0)) {
+            case BUTTON_SHORT:
+                page = (page + 1) % PAGE_COUNT;
+                page_elapsed_ms = 0;
+                scroll_pos = 0;
+                break;
+            case BUTTON_DOUBLE:
+                page = PAGE_TIME;
+                page_elapsed_ms = 0;
+                scroll_pos = 0;
+                break;
+            case BUTTON_LONG:
+                screen_on = !screen_on;
+                screen_power(&screen, screen_on,
+                             screen_on ? a->brightness : 0);
+                if (!screen_on) {
+                    uint8_t blank[FRAME_COLS] = {0};
+                    screen_write_frame(&screen, blank, 0);
+                }
+                break;
+            default:
+                break;
+            }
+        }
+        if (!screen_on) { sleep_ms(a->poll_ms); continue; }
+
         monitor_poll(&mon);
         page_render(page, &mon, a->sun_coords, text, sizeof(text));
         size_t ncols = font_render(text, cols, COLS_MAX);
@@ -159,7 +219,12 @@ static int run_hw(const app_args_t *a)
             scroll_pos = 0;
         }
     }
-    /* not reached in v0.1; SIGTERM handling comes with the daemon phase */
+
+    /* graceful shutdown: blank panel, power off, release GPIO */
+    screen_power(&screen, false, 0);
+    if (button_ok) button_close(&button);
+    screen_close(&screen);
+    return 0;
 }
 
 int app_run(const app_args_t *a)
@@ -172,7 +237,7 @@ int app_self_test(void)
     int failures = 0;
 
     /* font sanity */
-    uint8_t cols[16];
+    uint8_t cols[64];
     size_t n = font_render("12:34", cols, sizeof(cols));
     if (n == 0 || n > sizeof(cols)) {
         fprintf(stderr, "FAIL font render\n");
@@ -231,6 +296,12 @@ int app_self_test(void)
     if (strcmp(buf, "T:45.52") != 0) { fprintf(stderr, "FAIL temp format: %s\n", buf); failures++; }
     monitor_format_net(&m, true, buf, sizeof(buf));
     if (strcmp(buf, "D:1.2M") != 0) { fprintf(stderr, "FAIL net format: %s\n", buf); failures++; }
+
+    /* time page must be exactly 27 columns (no scrolling/jitter) */
+    n = font_render("12^34^56", cols, sizeof(cols));
+    if (n != 27) { fprintf(stderr, "FAIL time width on=%zu\n", n); failures++; }
+    n = font_render("12 34^56", cols, sizeof(cols));
+    if (n != 27) { fprintf(stderr, "FAIL time width off=%zu\n", n); failures++; }
 
     printf("%s: %d failure(s)\n", failures == 0 ? "PASS" : "FAIL", failures);
     return failures == 0 ? 0 : 1;

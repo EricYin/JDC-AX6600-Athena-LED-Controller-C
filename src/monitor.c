@@ -1,5 +1,6 @@
 #include "monitor.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -60,7 +61,10 @@ static bool read_net(const char *iface, uint64_t *rx, uint64_t *tx)
         char *colon = strchr(line, ':');
         if (!colon) continue;
         *colon = '\0';
-        if (strcmp(line, iface) != 0) continue;
+        /* /proc/net/dev pads interface names with leading spaces. */
+        char *name = line;
+        while (isspace((unsigned char)*name)) name++;
+        if (strcmp(name, iface) != 0) continue;
         unsigned long long r=0, t=0;
         if (sscanf(colon + 1, "%llu %*u %*u %*u %*u %*u %*u %*u %llu",
                    &r, &t) >= 2) {
