@@ -20,6 +20,9 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+/* Bound for /dev/gpiochipN paths; dirent names max 255, +"/dev/"+NUL. */
+#define CDEV_PATH_MAX 320
+
 #define PIN_STB_LEFT  69u
 #define PIN_STB_RIGHT 70u
 #define PIN_CLK       73u
@@ -82,12 +85,12 @@ static bool cdev_find_main_chip(char *path, size_t pathlen)
     DIR *d = opendir("/dev");
     if (!d) return false;
 
-    char best[320] = "";
+    char best[CDEV_PATH_MAX] = "";
     uint32_t best_lines = 0;
     struct dirent *de;
     while ((de = readdir(d)) != NULL) {
         if (strncmp(de->d_name, "gpiochip", 8) != 0) continue;
-        char cur[320];
+        char cur[CDEV_PATH_MAX];
         snprintf(cur, sizeof(cur), "/dev/%s", de->d_name);
         int fd = open(cur, O_RDONLY | O_CLOEXEC);
         if (fd < 0) continue;
@@ -114,7 +117,7 @@ static bool cdev_find_main_chip(char *path, size_t pathlen)
 
 static bool cdev_request_outputs(void)
 {
-    char chip[64];
+    char chip[CDEV_PATH_MAX];
     if (!cdev_find_main_chip(chip, sizeof(chip))) return false;
 
     int fd = open(chip, O_RDONLY | O_CLOEXEC);
