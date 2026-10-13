@@ -18,6 +18,10 @@ load_uci() {
 		[ -n "$1" ] && pages_list="${pages_list}${pages_list:+,}$1"
 	}
 	config_list_foreach main pages append_page
+	if [ -z "$pages_list" ]; then
+		config_get pages_opt main pages ""
+		[ -n "$pages_opt" ] && pages_list="$pages_opt"
+	fi
 	[ -z "$pages_list" ] && pages_list="time"
 }
 

@@ -3,6 +3,7 @@
 'require form';
 'require fs';
 'require ui';
+'require uci';
 'require poll';
 'require network';
 
@@ -155,7 +156,8 @@ function buildButtonHelpBox() {
 return view.extend({
 	load: function() {
 		return Promise.all([
-			network.getDevices().catch(function() { return []; })
+			network.getDevices().catch(function() { return []; }),
+			uci.load('athena-led-c')
 		]);
 	},
 
@@ -167,12 +169,11 @@ return view.extend({
 			_('Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Single-screen static display, zero horizontal scrolling, lazy monitoring.'));
 
 		// ============================================================
-		// 板块 1: 屏幕点阵预览与显示功能勾选（复选框直接集成在功能卡片旁）
+		// 板块 1: 屏幕点阵预览与显示功能勾选
 		// ============================================================
 		s = m.section(form.NamedSection, 'main', 'main', _('Screen Preview & Display Features'));
 		s.addremove = false;
 
-		// 声明全局预览更新函数
 		var previewCanvas = null;
 		function updatePreview(text) {
 			if (previewCanvas) {
@@ -181,17 +182,20 @@ return view.extend({
 			}
 		}
 
-		// 自定义整合控件：画布 + 直接带复选框的功能项列表
-		o = s.option(form.MultiValue, 'pages', _('Display Pages'));
-		PAGE_ITEMS.forEach(function(item) {
-			o.value(item.id, item.label);
-		});
-		o.default = ['time', 'temp', 'date'];
+		// 核心：绑定 pages 选项，自定义渲染控件与提交逻辑
+		o = s.option(form.DynamicList, 'pages', _('Display Pages'));
+		o.rmempty = false;
 
-		// 重写 renderWidget：渲染 Canvas 实时点阵屏并在下方直接展示带复选框的交互卡片
+		o.cfgvalue = function(section_id) {
+			var val = uci.get('athena-led-c', section_id, 'pages');
+			if (val == null)
+				return ['time', 'temp', 'date'];
+			return Array.isArray(val) ? val : [val];
+		};
+
 		o.renderWidget = function(section_id, option_index, cfgvalue) {
 			var self = this;
-			var selectedValues = Array.isArray(cfgvalue) ? cfgvalue : (cfgvalue ? [cfgvalue] : self.default);
+			var selectedValues = Array.isArray(cfgvalue) ? cfgvalue : (cfgvalue ? [cfgvalue] : ['time', 'temp', 'date']);
 
 			var CELL = 12, PAD = 10;
 			var canvas = E('canvas', {
@@ -201,7 +205,7 @@ return view.extend({
 			});
 			previewCanvas = canvas;
 
-			// 默认预览首个选中项或时钟
+			// 初始展示首个勾选项的点阵
 			var initialText = '12:34:56';
 			if (selectedValues.length > 0) {
 				for (var k = 0; k < PAGE_ITEMS.length; k++) {
@@ -213,7 +217,7 @@ return view.extend({
 			}
 			drawLedFrame(canvas, textToColumns(initialText));
 
-			// 组装带复选框的卡片列表
+			// 组装带复选框的交互卡片
 			var cardsContainer = E('div', {
 				style: 'display:flex;flex-wrap:wrap;gap:10px;margin-top:6px'
 			});
@@ -223,8 +227,7 @@ return view.extend({
 
 				var cb = E('input', {
 					type: 'checkbox',
-					name: self.cbid(section_id),
-					value: item.id,
+					'data-page-id': item.id,
 					checked: isChecked,
 					style: 'margin-right:8px;transform:scale(1.2);cursor:pointer'
 				});
@@ -237,7 +240,8 @@ return view.extend({
 					cb,
 					E('span', {
 						style: 'font-weight:500;font-size:13px;',
-						click: function() {
+						click: function(ev) {
+							// 点击文字只预览点阵，不额外触发两次 checkbox 事件
 							updatePreview(item.preview);
 						}
 					}, item.icon + ' ' + item.label + ' (' + item.preview + ')')
@@ -256,6 +260,23 @@ return view.extend({
 				canvas,
 				cardsContainer
 			]);
+		};
+
+		// 🌟 重写 formvalue：精准收集所有勾选的 checkbox 属性 data-page-id
+		o.formvalue = function(section_id) {
+			var checked = [];
+			var cbs = document.querySelectorAll('input[type="checkbox"][data-page-id]');
+			for (var i = 0; i < cbs.length; i++) {
+				if (cbs[i].checked)
+					checked.push(cbs[i].getAttribute('data-page-id'));
+			}
+			return checked.length > 0 ? checked : ['time'];
+		};
+
+		// 🌟 重写 write：将选中的数组原子写入 UCI 的 list pages 列表
+		o.write = function(section_id, formvalue) {
+			var values = Array.isArray(formvalue) ? formvalue : (formvalue ? [formvalue] : ['time']);
+			return uci.set('athena-led-c', section_id, 'pages', values);
 		};
 
 		// ============================================================
