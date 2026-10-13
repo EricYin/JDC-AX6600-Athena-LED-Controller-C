@@ -52,6 +52,8 @@ define Package/athena-led-c/install
 	$(INSTALL_CONF) ./files/athena-led-c.config $(1)/etc/config/athena-led-c
 	$(INSTALL_DIR) $(1)/etc/rc.button
 	$(INSTALL_BIN) ./files/screen.button $(1)/etc/rc.button/screen
+	ln -sf screen $(1)/etc/rc.button/BTN_1
+	ln -sf screen $(1)/etc/rc.button/btn_1
 endef
 
 $(eval $(call BuildPackage,athena-led-c))

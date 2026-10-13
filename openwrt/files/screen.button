@@ -1,4 +1,5 @@
 #!/bin/sh
+logger -t athena-btn "BUTTON=$BUTTON ACTION=$ACTION SEEN=$SEEN"
 PID=$(cat /var/run/athena-led-c.pid 2>/dev/null)
 [ -n "$PID" ] || exit 0
 
