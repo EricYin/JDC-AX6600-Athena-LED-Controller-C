@@ -1,9 +1,6 @@
-/* glibc exposes tm_gmtoff only with _GNU_SOURCE / _DEFAULT_SOURCE. */
-#define _GNU_SOURCE
 #include "pages.h"
 
 #include "lunar.h"
-#include "sun.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -16,38 +13,7 @@ static void local_now(struct tm *tm)
         memset(tm, 0, sizeof(*tm));
 }
 
-static int day_of_year(const struct tm *tm)
-{
-    return tm->tm_yday + 1;
-}
-
-static double local_tz_hours(void)
-{
-    time_t t = time(NULL);
-    struct tm local;
-    if (!localtime_r(&t, &local)) return 8.0;
-    return (double)(local.tm_gmtoff) / 3600.0;
-}
-
-/* Default location: Beijing. Can be overridden by --sun-coords "lat,lon". */
-static bool parse_coords(const char *s, double *lat, double *lon)
-{
-    if (!s || !*s) { *lat = 39.90; *lon = 116.40; return true; }
-    double a, b;
-    if (sscanf(s, "%lf,%lf", &a, &b) != 2) { *lat = 39.90; *lon = 116.40; return false; }
-    if (a < -90.0 || a > 90.0 || b < -180.0 || b > 180.0) return false;
-    *lat = a; *lon = b;
-    return true;
-}
-
-static void fmt_hour(double hours, char *buf, size_t len)
-{
-    long total = (long)(hours * 60.0 + 0.5) % (24 * 60);
-    snprintf(buf, len, "%ld:%02ld", total / 60, total % 60);
-}
-
-void page_render(page_id_t page, const monitor_t *mon,
-                 const char *sun_coords, char *buf, size_t len)
+void page_render(page_id_t page, const monitor_t *mon, char *buf, size_t len)
 {
     struct tm tm;
     local_now(&tm);
@@ -55,8 +21,8 @@ void page_render(page_id_t page, const monitor_t *mon,
     switch (page) {
     case PAGE_TIME: {
         /*
-         * Blinking colon, exactly 27 columns (single screen, no scrolling):
-         * 6 digits x3 + 2 compact colons x1 + 7 gaps = 27.
+         * Blinking compact colon '^', exactly 27 columns (single screen):
+         * 6 digits x3 + 2 compact colons x1 + 7 gaps = 27 cols.
          */
         char colon = (tm.tm_sec % 2 == 0) ? '^' : ' ';
         snprintf(buf, len, "%02d%c%02d^%02d",
@@ -64,33 +30,13 @@ void page_render(page_id_t page, const monitor_t *mon,
         break;
     }
     case PAGE_DATE:
-        /* Compact date MM-DD (19 cols, perfectly centered) */
+        /* Compact date MM-DD (19 cols, centered) */
         snprintf(buf, len, "%02d-%02d", tm.tm_mon + 1, tm.tm_mday);
         break;
     case PAGE_LUNAR:
         /* Lunar date L:M.D (17 cols, centered) */
         lunar_today(buf, len);
         break;
-    case PAGE_SUN: {
-        double lat, lon;
-        parse_coords(sun_coords, &lat, &lon);
-        double rise, set;
-        if (!sun_calc(lat, lon, day_of_year(&tm), local_tz_hours(), &rise, &set)) {
-            snprintf(buf, len, "SUN:--");
-        } else {
-            /* Daylight -> Sunset (S:HH:MM); Night -> Sunrise (R:HH:MM). 21 cols, centered. */
-            double now_h = (double)tm.tm_hour + (double)tm.tm_min / 60.0;
-            char hbuf[8];
-            if (now_h >= rise && now_h < set) {
-                fmt_hour(set, hbuf, sizeof(hbuf));
-                snprintf(buf, len, "S:%s", hbuf);
-            } else {
-                fmt_hour(rise, hbuf, sizeof(hbuf));
-                snprintf(buf, len, "R:%s", hbuf);
-            }
-        }
-        break;
-    }
     case PAGE_CPU:
         monitor_format_cpu(mon, buf, len);
         break;
@@ -115,7 +61,7 @@ void page_render(page_id_t page, const monitor_t *mon,
 const char *page_name(page_id_t page)
 {
     static const char *names[PAGE_COUNT] = {
-        "time", "date", "lunar", "sun",
+        "time", "date", "lunar",
         "cpu", "mem", "temp", "net_down", "net_up"
     };
     if ((int)page < 0 || page >= PAGE_COUNT) return "?";
@@ -128,7 +74,6 @@ page_id_t page_from_name(const char *name)
     if (strcmp(name, "time") == 0) return PAGE_TIME;
     if (strcmp(name, "date") == 0) return PAGE_DATE;
     if (strcmp(name, "lunar") == 0) return PAGE_LUNAR;
-    if (strcmp(name, "sun") == 0) return PAGE_SUN;
     if (strcmp(name, "cpu") == 0) return PAGE_CPU;
     if (strcmp(name, "mem") == 0) return PAGE_MEM;
     if (strcmp(name, "temp") == 0) return PAGE_TEMP;

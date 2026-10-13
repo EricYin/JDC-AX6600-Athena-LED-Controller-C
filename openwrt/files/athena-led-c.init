@@ -12,7 +12,6 @@ load_uci() {
 	config_get page_secs main page_secs 0
 	config_get poll_ms main poll_ms 250
 	config_get net_interface main net_interface br-lan
-	config_get sun_coords main sun_coords '39.90,116.40'
 
 	pages_list=""
 	append_page() {
@@ -32,7 +31,6 @@ start_service() {
 		--page-secs "$page_secs" \
 		--poll-ms "$poll_ms" \
 		--net-interface "$net_interface" \
-		--sun-coords "$sun_coords" \
 		--pages "$pages_list"
 	procd_set_param pidfile /var/run/athena-led-c.pid
 	procd_set_param stdout 1

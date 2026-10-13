@@ -15,7 +15,6 @@ typedef struct {
     unsigned poll_ms;       /* --poll-ms, default 250 */
     uint8_t brightness;     /* --brightness, 0..7 */
     const char *net_if;     /* --net-interface */
-    const char *sun_coords; /* --sun-coords "lat,lon" */
     page_id_t pages[PAGE_COUNT];
     size_t num_pages;
 } app_args_t;

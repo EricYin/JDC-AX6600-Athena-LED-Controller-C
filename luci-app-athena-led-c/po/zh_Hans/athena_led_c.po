@@ -7,8 +7,8 @@ msgstr "雅典娜 LED (C版)"
 msgid "Athena LED Controller (C)"
 msgstr "京东云雅典娜 LED 点阵屏控制器 (纯 C 版)"
 
-msgid "Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Ultra-low resource usage, hardware TM1628A driver with on-demand lazy monitoring."
-msgstr "专为京东云雅典娜 AX6600 (RE-CS-02) 打造的纯 C11 LED 守护进程。极致超低系统开销，TM1628A 硬件驱动，单屏静态显示与按需惰性监控采样。"
+msgid "Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Single-screen static display, zero horizontal scrolling, lazy monitoring."
+msgstr "专为京东云雅典娜 AX6600 (RE-CS-02) 打造的纯 C11 LED 控制守护进程。单屏静态显示，彻底去除横向翻滚，按需惰性监控采样。"
 
 msgid "Running Status"
 msgstr "运行状态"
@@ -28,17 +28,11 @@ msgstr "命令执行失败，返回码 %d"
 msgid "Service action \"%s\" executed successfully."
 msgstr "服务操作「%s」执行成功。"
 
-msgid "Screen Preview"
-msgstr "屏幕点阵预览"
+msgid "Screen Preview & Display Features"
+msgstr "屏幕点阵预览与显示功能勾选"
 
-msgid "Simulates the 27×5 LED matrix display in real-time. Each display item occupies exactly one single screen (static centered, no scrolling)."
-msgstr "实时模拟真实 27×5 LED 点阵屏硬件显示效果。每个显示项严格只占一屏（居中静止显示，彻底去除横滚）。"
-
-msgid "Type text to preview..."
-msgstr "输入任意文本以实时预览..."
-
-msgid "Click preset buttons below or type custom text"
-msgstr "点击下方快捷按钮或在输入框输入文本预览单屏点阵"
+msgid "Display Pages"
+msgstr "显示页面选择"
 
 msgid "Time"
 msgstr "时钟"
@@ -49,26 +43,23 @@ msgstr "日期"
 msgid "Lunar"
 msgstr "农历"
 
-msgid "Sunset"
-msgstr "日落时刻"
-
-msgid "Sunrise"
-msgstr "日出时刻"
-
 msgid "CPU"
-msgstr "CPU"
+msgstr "CPU 占用"
 
 msgid "Memory"
-msgstr "内存"
+msgstr "内存占用"
 
 msgid "Temperature"
-msgstr "温度"
+msgstr "系统温度"
 
 msgid "Download"
-msgstr "下行网速"
+msgstr "下载网速"
 
 msgid "Upload"
-msgstr "上行网速"
+msgstr "上传网速"
+
+msgid "Simulates the 27×5 LED matrix in real-time. Check the boxes to select pages for rotation; click any label to preview its matrix."
+msgstr "实时模拟真实 27×5 LED 点阵屏硬件显示效果。勾选复选框即可将其加入轮播队列；点击任意功能名称可在上方实时预览点阵。"
 
 msgid "Physical Button Gestures"
 msgstr "机身物理按键手势说明"
@@ -115,43 +106,10 @@ msgstr " (默认)"
 msgid " (Brightest)"
 msgstr " (最亮)"
 
-msgid "Display Pages"
-msgstr "显示内容选择 (复选框)"
-
-msgid "Time (HH:MM:SS)"
-msgstr "时钟 (HH:MM:SS 冒号跳动)"
-
-msgid "Date (MM-DD)"
-msgstr "日期 (MM-DD 单屏静态)"
-
-msgid "Lunar Date (L:M.D)"
-msgstr "农历日期 (L:月.日 单屏静态)"
-
-msgid "Sunrise / Sunset (R: / S:)"
-msgstr "日出/日落时刻 (白天日落S / 夜晚日出R)"
-
-msgid "CPU Usage (C:%)"
-msgstr "CPU 使用率 (C:%)"
-
-msgid "Memory Usage (M:%)"
-msgstr "内存使用率 (M:%)"
-
-msgid "System Temperature (T:°C)"
-msgstr "系统温度 (T:CPU.NSS°C)"
-
-msgid "Download Speed (D:Bps)"
-msgstr "下行网速 (D:实时下载速率)"
-
-msgid "Upload Speed (U:Bps)"
-msgstr "上行网速 (U:实时上传速率)"
-
-msgid "Check the pages to display. If multiple pages are checked, the screen will switch between them. If only one is selected, it stays fixed on that page. Pages not currently displayed will NOT poll system metrics to save resources."
-msgstr "勾选要显示的内容。勾选多个时按顺序翻屏切换；只勾选一个时固定停留在该屏。未处于显示状态的内容（或未勾选的内容）后台绝不进行监控采样，彻底杜绝无用系统开销。"
-
 msgid "Page Display Time (seconds)"
 msgstr "页面停留时间 (秒)"
 
-msgid "Auto-rotation interval in seconds. Set to 0 to disable auto-rotation (manual switching via router button only). Greater than 0 enables automatic flipping."
+msgid "Seconds to stay on each page before switching. Set to 0 for manual button flipping only (no auto-rotation). Greater than 0 enables automatic flipping."
 msgstr "页面自动轮播停留时间（秒）。设置为 0 则完全不自动翻屏，仅通过机身按键手动切页；大于 0 则自动定时翻屏。"
 
 msgid "Traffic Monitor Interface"
@@ -160,47 +118,14 @@ msgstr "流量监控网卡接口"
 msgid "Network interface to monitor throughput for download and upload pages."
 msgstr "上下行网速监控所统计的网卡接口（例如 br-lan 或 wan）。"
 
-msgid "Coordinates for Sunrise/Sunset"
-msgstr "日出日落经纬度坐标"
-
-msgid "Latitude and longitude (\"lat,lon\") used by the local solar algorithm to calculate sunrise and sunset times."
-msgstr "用于本地太阳算法计算日出日落时间的经纬度坐标（格式：\"纬度,经度\"，无需联网）。"
-
-msgid "Beijing (39.90, 116.40)"
-msgstr "北京 (39.90, 116.40)"
-
-msgid "Shanghai (31.23, 121.47)"
-msgstr "上海 (31.23, 121.47)"
-
-msgid "Guangzhou (23.13, 113.26)"
-msgstr "广州 (23.13, 113.26)"
-
-msgid "Shenzhen (22.54, 114.05)"
-msgstr "深圳 (22.54, 114.05)"
-
-msgid "Chengdu (30.67, 104.06)"
-msgstr "成都 (30.67, 104.06)"
-
-msgid "Wuhan (30.59, 114.31)"
-msgstr "武汉 (30.59, 114.31)"
-
-msgid "Nanjing (32.06, 118.80)"
-msgstr "南京 (32.06, 118.80)"
-
-msgid "Hangzhou (30.27, 120.15)"
-msgstr "杭州 (30.27, 120.15)"
-
-msgid "Xi'an (34.26, 108.94)"
-msgstr "西安 (34.26, 108.94)"
-
 msgid "Advanced Tuning"
 msgstr "高级调优"
 
 msgid "Sampling Interval (ms)"
 msgstr "采样与按键扫描周期 (毫秒)"
 
-msgid "System sensor sampling and button polling interval in milliseconds (default 250ms)."
-msgstr "按键边缘检测与当前活动页面的数据刷新周期（默认 250ms，idle 状态由 poll 挂起不占 CPU）。"
+msgid "Key scanning and sensor refresh interval in milliseconds (default 250ms)."
+msgstr "按键与当前活动页面的数据刷新周期（默认 250ms，idle 状态下由 poll 挂起不占 CPU）。"
 
 msgid "Service Control"
 msgstr "服务操作"

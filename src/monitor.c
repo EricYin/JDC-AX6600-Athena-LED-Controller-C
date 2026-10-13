@@ -154,22 +154,23 @@ static void poll_net(monitor_t *m)
 
 void monitor_poll_page(monitor_t *m, int page)
 {
+    /* PAGE_CPU=3, PAGE_MEM=4, PAGE_TEMP=5, PAGE_NET_DOWN=6, PAGE_NET_UP=7 */
     switch (page) {
-    case 4: /* PAGE_CPU */
+    case 3: /* PAGE_CPU */
         poll_cpu(m);
         break;
-    case 5: /* PAGE_MEM */
+    case 4: /* PAGE_MEM */
         poll_mem(m);
         break;
-    case 6: /* PAGE_TEMP */
+    case 5: /* PAGE_TEMP */
         poll_temp(m);
         break;
-    case 7: /* PAGE_NET_DOWN */
-    case 8: /* PAGE_NET_UP */
+    case 6: /* PAGE_NET_DOWN */
+    case 7: /* PAGE_NET_UP */
         poll_net(m);
         break;
     default:
-        /* TIME, DATE, LUNAR, SUN: zero file I/O, zero syscalls! */
+        /* TIME (0), DATE (1), LUNAR (2): ZERO file I/O! */
         break;
     }
 }

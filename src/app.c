@@ -7,7 +7,6 @@
 #include "pages.h"
 #include "screen.h"
 #include "sim.h"
-#include "sun.h"
 
 #include <errno.h>
 #include <signal.h>
@@ -110,7 +109,7 @@ static int run_sim(const app_args_t *a)
         /* Lazy polling: poll ONLY when the current page actually needs the metric */
         monitor_poll_page(&mon, cur_page);
 
-        page_render(cur_page, &mon, a->sun_coords, text, sizeof(text));
+        page_render(cur_page, &mon, text, sizeof(text));
         size_t ncols = font_render(text, cols, COLS_MAX);
 
         build_frame_centered(cols, ncols, frame);
@@ -211,7 +210,7 @@ static int run_hw(const app_args_t *a)
         /* Lazy polling: poll ONLY when the current page needs the metric */
         monitor_poll_page(&mon, cur_page);
 
-        page_render(cur_page, &mon, a->sun_coords, text, sizeof(text));
+        page_render(cur_page, &mon, text, sizeof(text));
         size_t ncols = font_render(text, cols, COLS_MAX);
 
         build_frame_centered(cols, ncols, frame);
@@ -257,13 +256,6 @@ int app_self_test(void)
     if (!lunar_from_gregorian(2025, 1, 29, &ld) ||
         ld.year != 2025 || ld.month != 1 || ld.day != 1 || ld.leap_month) {
         fprintf(stderr, "FAIL lunar spring festival 2025\n");
-        failures++;
-    }
-
-    /* sunrise/sunset */
-    double rise, set;
-    if (!sun_calc(39.90, 116.40, 172, 8.0, &rise, &set)) {
-        fprintf(stderr, "FAIL sun polar miscalc\n");
         failures++;
     }
 

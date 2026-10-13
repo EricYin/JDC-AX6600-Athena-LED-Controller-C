@@ -15,13 +15,12 @@ static void usage(FILE *out)
 "  --sim, --test             run terminal simulator (27x5, ■/·)\n"
 "  --no-clear                simulator: do not clear terminal each frame\n"
 "  --pages LIST              comma/space separated pages to display:\n"
-"                            time,date,lunar,sun,cpu,mem,temp,net_down,net_up\n"
+"                            time,date,lunar,cpu,mem,temp,net_down,net_up\n"
 "  --page NAME               add a single page to the display rotation\n"
 "  --page-secs N             seconds per page (0 = manual button switch only)\n"
 "  --poll-ms N               sampling interval in ms (default 250)\n"
 "  --brightness 0..7         panel brightness (default 5)\n"
 "  --net-interface NAME      interface for throughput (default br-lan)\n"
-"  --sun-coords LAT,LON      sunrise/sunset location (default Beijing)\n"
 "  --self-test               run built-in tests and exit\n"
 "  -h, --help                show this help\n",
     out);
@@ -31,7 +30,6 @@ static void add_page(app_args_t *a, const char *name)
 {
     if (a->num_pages >= PAGE_COUNT) return;
     page_id_t p = page_from_name(name);
-    /* avoid duplicate contiguous if desired, or allow freely */
     a->pages[a->num_pages++] = p;
 }
 
@@ -53,7 +51,6 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
     a->poll_ms = 250;
     a->brightness = 5;
     a->net_if = "br-lan";
-    a->sun_coords = "";
     a->num_pages = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -79,8 +76,6 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
             a->brightness = (uint8_t)(strtoul(argv[++i], NULL, 10) & 0x07);
         } else if (strcmp(arg, "--net-interface") == 0 && i + 1 < argc) {
             a->net_if = argv[++i];
-        } else if (strcmp(arg, "--sun-coords") == 0 && i + 1 < argc) {
-            a->sun_coords = argv[++i];
         } else {
             fprintf(stderr, "Unknown option: %s\n", arg);
             usage(stderr);
@@ -88,7 +83,6 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
         }
     }
 
-    /* Fallback: if no pages specified, default to time */
     if (a->num_pages == 0) {
         a->pages[0] = PAGE_TIME;
         a->num_pages = 1;

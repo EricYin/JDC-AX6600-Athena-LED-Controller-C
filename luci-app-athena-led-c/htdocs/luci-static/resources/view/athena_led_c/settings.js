@@ -9,10 +9,9 @@
 /*
  * Athena LED Controller (C) — LuCI JS Settings View
  * For JDCloud AX6600 (RE-CS-02) Pure C LED Daemon
- * Single-screen static display, multi-page selection, zero idle polling
+ * Single-screen static display, direct checkbox selection with live preview
  */
 
-// Service status query: check PID file first, then verify cmdline, fallback to pidof
 function getServiceStatus() {
 	return fs.read('/var/run/athena-led-c.pid').then(function(pid) {
 		pid = (pid || '').trim();
@@ -121,72 +120,17 @@ function drawLedFrame(canvas, cols) {
 	}
 }
 
-function buildPreviewBox() {
-	var CELL = 12, PAD = 10;
-	var canvas = E('canvas', {
-		width: 27 * CELL + PAD * 2,
-		height: 5 * CELL + PAD * 2,
-		style: 'background:#1a1a1a;border-radius:8px;display:block;margin-top:10px'
-	});
-
-	var input = E('input', {
-		type: 'text',
-		class: 'cbi-input-text',
-		style: 'max-width:320px;margin-right:10px',
-		value: '12:34:56',
-		placeholder: _('Type text to preview...')
-	});
-
-	var cols = textToColumns(input.value);
-
-	function updateCanvas(text) {
-		input.value = text;
-		cols = textToColumns(text);
-		drawLedFrame(canvas, cols);
-	}
-
-	input.addEventListener('input', function() {
-		cols = textToColumns(input.value);
-		drawLedFrame(canvas, cols);
-	});
-
-	drawLedFrame(canvas, cols);
-
-	var presets = [
-		{ label: _('Time'), text: '12:34:56' },
-		{ label: _('Date'), text: '10-13' },
-		{ label: _('Lunar'), text: 'L:9.4' },
-		{ label: _('Sunset'), text: 'S:18:45' },
-		{ label: _('Sunrise'), text: 'R:06:12' },
-		{ label: _('CPU'), text: 'C:12%' },
-		{ label: _('Memory'), text: 'M:35%' },
-		{ label: _('Temperature'), text: 'T:45.52' },
-		{ label: _('Download'), text: 'D:12.5M' },
-		{ label: _('Upload'), text: 'U:1.8M' }
-	];
-
-	var presetButtons = E('div', { style: 'margin-top:8px;display:flex;flex-wrap:wrap;gap:6px' },
-		presets.map(function(p) {
-			return E('button', {
-				class: 'cbi-button cbi-button-neutral',
-				style: 'padding:2px 8px;font-size:12px',
-				click: function() { updateCanvas(p.text); }
-			}, p.label + ' (' + p.text + ')');
-		})
-	);
-
-	return E('div', { 'class': 'cbi-section' }, [
-		E('h3', {}, _('Screen Preview')),
-		E('div', { 'class': 'cbi-section-descr' },
-			_('Simulates the 27×5 LED matrix display in real-time. Each display item occupies exactly one single screen (static centered, no scrolling).')),
-		E('div', { style: 'display:flex;align-items:center;flex-wrap:wrap;gap:8px' }, [
-			input,
-			E('span', { class: 'cbi-value-description' }, _('Click preset buttons below or type custom text'))
-		]),
-		presetButtons,
-		canvas
-	]);
-}
+// 7 个纯本地功能项（无日出日落）
+var PAGE_ITEMS = [
+	{ id: 'time',     label: _('Time'),        icon: '🕒', preview: '12:34:56' },
+	{ id: 'date',     label: _('Date'),        icon: '📅', preview: '10-13' },
+	{ id: 'lunar',    label: _('Lunar'),       icon: '🏮', preview: 'L:9.4' },
+	{ id: 'cpu',      label: _('CPU'),         icon: '💻', preview: 'C:12%' },
+	{ id: 'mem',      label: _('Memory'),      icon: '💾', preview: 'M:35%' },
+	{ id: 'temp',     label: _('Temperature'), icon: '🌡️', preview: 'T:45.52' },
+	{ id: 'net_down', label: _('Download'),    icon: '⬇️', preview: 'D:12.5M' },
+	{ id: 'net_up',   label: _('Upload'),      icon: '⬆️', preview: 'U:1.8M' }
+];
 
 function buildButtonHelpBox() {
 	return E('div', { 'class': 'cbi-section' }, [
@@ -220,10 +164,102 @@ return view.extend({
 		var m, s, o;
 
 		m = new form.Map('athena-led-c', _('Athena LED Controller (C)'),
-			_('Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Ultra-low resource usage, hardware TM1628A driver with on-demand lazy monitoring.'));
+			_('Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Single-screen static display, zero horizontal scrolling, lazy monitoring.'));
 
 		// ============================================================
-		// 板块 1: 基本设置
+		// 板块 1: 屏幕点阵预览与显示功能勾选（复选框直接集成在功能卡片旁）
+		// ============================================================
+		s = m.section(form.NamedSection, 'main', 'main', _('Screen Preview & Display Features'));
+		s.addremove = false;
+
+		// 声明全局预览更新函数
+		var previewCanvas = null;
+		function updatePreview(text) {
+			if (previewCanvas) {
+				var cols = textToColumns(text);
+				drawLedFrame(previewCanvas, cols);
+			}
+		}
+
+		// 自定义整合控件：画布 + 直接带复选框的功能项列表
+		o = s.option(form.MultiValue, 'pages', _('Display Pages'));
+		PAGE_ITEMS.forEach(function(item) {
+			o.value(item.id, item.label);
+		});
+		o.default = ['time', 'temp', 'date'];
+
+		// 重写 renderWidget：渲染 Canvas 实时点阵屏并在下方直接展示带复选框的交互卡片
+		o.renderWidget = function(section_id, option_index, cfgvalue) {
+			var self = this;
+			var selectedValues = Array.isArray(cfgvalue) ? cfgvalue : (cfgvalue ? [cfgvalue] : self.default);
+
+			var CELL = 12, PAD = 10;
+			var canvas = E('canvas', {
+				width: 27 * CELL + PAD * 2,
+				height: 5 * CELL + PAD * 2,
+				style: 'background:#1a1a1a;border-radius:8px;display:block;margin:6px 0 14px 0'
+			});
+			previewCanvas = canvas;
+
+			// 默认预览首个选中项或时钟
+			var initialText = '12:34:56';
+			if (selectedValues.length > 0) {
+				for (var k = 0; k < PAGE_ITEMS.length; k++) {
+					if (PAGE_ITEMS[k].id === selectedValues[0]) {
+						initialText = PAGE_ITEMS[k].preview;
+						break;
+					}
+				}
+			}
+			drawLedFrame(canvas, textToColumns(initialText));
+
+			// 组装带复选框的卡片列表
+			var cardsContainer = E('div', {
+				style: 'display:flex;flex-wrap:wrap;gap:10px;margin-top:6px'
+			});
+
+			PAGE_ITEMS.forEach(function(item) {
+				var isChecked = selectedValues.indexOf(item.id) !== -1;
+
+				var cb = E('input', {
+					type: 'checkbox',
+					name: self.cbid(section_id),
+					value: item.id,
+					checked: isChecked,
+					style: 'margin-right:8px;transform:scale(1.2);cursor:pointer'
+				});
+
+				var card = E('label', {
+					style: 'display:inline-flex;align-items:center;padding:7px 14px;' +
+					       'background:#f8f9fa;border:1px solid #ced4da;border-radius:6px;' +
+					       'cursor:pointer;user-select:none;transition:all 0.15s ease;'
+				}, [
+					cb,
+					E('span', {
+						style: 'font-weight:500;font-size:13px;',
+						click: function() {
+							updatePreview(item.preview);
+						}
+					}, item.icon + ' ' + item.label + ' (' + item.preview + ')')
+				]);
+
+				cb.addEventListener('change', function() {
+					updatePreview(item.preview);
+				});
+
+				cardsContainer.appendChild(card);
+			});
+
+			return E('div', { 'class': 'cbi-value-field' }, [
+				E('div', { style: 'margin-bottom:4px;font-size:12px;color:#6c757d' },
+					_('Simulates the 27×5 LED matrix in real-time. Check the boxes to select pages for rotation; click any label to preview its matrix.')),
+				canvas,
+				cardsContainer
+			]);
+		};
+
+		// ============================================================
+		// 板块 2: 控制参数设置
 		// ============================================================
 		s = m.section(form.NamedSection, 'main', 'main', _('General Settings'));
 		s.addremove = false;
@@ -244,26 +280,10 @@ return view.extend({
 		}
 		o.description = _('Panel brightness level (0 to 7).');
 
-		// 🌟 核心需求：复选框选择显示内容，选中的才显示
-		o = s.option(form.MultiValue, 'pages', _('Display Pages'));
-		o.widget = 'checkbox';
-		o.value('time', _('Time (HH:MM:SS)'));
-		o.value('date', _('Date (MM-DD)'));
-		o.value('lunar', _('Lunar Date (L:M.D)'));
-		o.value('sun', _('Sunrise / Sunset (R: / S:)'));
-		o.value('cpu', _('CPU Usage (C:%)'));
-		o.value('mem', _('Memory Usage (M:%)'));
-		o.value('temp', _('System Temperature (T:°C)'));
-		o.value('net_down', _('Download Speed (D:Bps)'));
-		o.value('net_up', _('Upload Speed (U:Bps)'));
-		o.default = ['time'];
-		o.description = _('Check the pages to display. If multiple pages are checked, the screen will switch between them. If only one is selected, it stays fixed on that page. Pages not currently displayed will NOT poll system metrics to save resources.');
-
-		// 🌟 核心需求：停留时间为 0 则不自动轮播，只能手动按键翻屏
 		o = s.option(form.Value, 'page_secs', _('Page Display Time (seconds)'));
 		o.datatype = 'uinteger';
 		o.default = '0';
-		o.description = _('Auto-rotation interval in seconds. Set to 0 to disable auto-rotation (manual switching via router button only). Greater than 0 enables automatic flipping.');
+		o.description = _('Seconds to stay on each page before switching. Set to 0 for manual button flipping only (no auto-rotation). Greater than 0 enables automatic flipping.');
 
 		o = s.option(form.Value, 'net_interface', _('Traffic Monitor Interface'));
 		o.default = 'br-lan';
@@ -274,22 +294,8 @@ return view.extend({
 				o.value(name);
 		});
 
-		o = s.option(form.Value, 'sun_coords', _('Coordinates for Sunrise/Sunset'));
-		o.default = '39.90,116.40';
-		o.placeholder = '39.90,116.40';
-		o.value('39.90,116.40', _('Beijing (39.90, 116.40)'));
-		o.value('31.23,121.47', _('Shanghai (31.23, 121.47)'));
-		o.value('23.13,113.26', _('Guangzhou (23.13, 113.26)'));
-		o.value('22.54,114.05', _('Shenzhen (22.54, 114.05)'));
-		o.value('30.67,104.06', _('Chengdu (30.67, 104.06)'));
-		o.value('30.59,114.31', _('Wuhan (30.59, 114.31)'));
-		o.value('32.06,118.80', _('Nanjing (32.06, 118.80)'));
-		o.value('30.27,120.15', _('Hangzhou (30.27, 120.15)'));
-		o.value('34.26,108.94', _('Xi\'an (34.26, 108.94)'));
-		o.description = _('Latitude and longitude ("lat,lon") used by the local solar algorithm to calculate sunrise and sunset times.');
-
 		// ============================================================
-		// 板块 2: 高级调优
+		// 板块 3: 高级调优
 		// ============================================================
 		s = m.section(form.NamedSection, 'main', 'main', _('Advanced Tuning'));
 		s.addremove = false;
@@ -297,10 +303,10 @@ return view.extend({
 		o = s.option(form.Value, 'poll_ms', _('Sampling Interval (ms)'));
 		o.datatype = 'range(100,1000)';
 		o.default = '250';
-		o.description = _('System sensor sampling and button polling interval in milliseconds (default 250ms).');
+		o.description = _('Key scanning and sensor refresh interval in milliseconds (default 250ms).');
 
 		// ============================================================
-		// 板块 3: 服务操作
+		// 板块 4: 服务操作
 		// ============================================================
 		s = m.section(form.NamedSection, 'main', 'main', _('Service Control'));
 		s.addremove = false;
@@ -345,7 +351,6 @@ return view.extend({
 
 			return E('div', {}, [
 				statusBox,
-				buildPreviewBox(),
 				mapEl,
 				buildButtonHelpBox()
 			]);
