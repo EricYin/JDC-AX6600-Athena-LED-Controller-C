@@ -101,6 +101,10 @@ function drawLedFrame(canvas, cols, scrollOffset) {
 		var off = Math.floor((27 - cols.length) / 2);
 		for (var i = 0; i < cols.length; i++)
 			frame[off + i] = cols[i];
+	} else if (scrollOffset < 0) {
+		// Static mode without scrolling: show first 27 columns locked
+		for (var k = 0; k < 27; k++)
+			frame[k] = cols[k] || 0;
 	} else {
 		for (var j = 0; j < 27; j++)
 			frame[j] = cols[(scrollOffset + j) % (cols.length + 8)] || 0;
@@ -142,36 +146,64 @@ function buildPreviewBox() {
 		placeholder: _('Type text to preview...')
 	});
 
+	var scrollToggle = E('input', {
+		type: 'checkbox',
+		id: 'preview_scroll_toggle',
+		checked: true,
+		style: 'margin-right:5px;vertical-align:middle'
+	});
+
+	var scrollLabel = E('label', {
+		for: 'preview_scroll_toggle',
+		style: 'font-size:13px;cursor:pointer;margin-right:12px;user-select:none'
+	}, _('Preview Scrolling'));
+
 	var cols = textToColumns(input.value);
 	var offset = 0;
+
+	function renderNow() {
+		if (scrollToggle.checked) {
+			drawLedFrame(canvas, cols, offset);
+		} else {
+			drawLedFrame(canvas, cols, -1);
+		}
+	}
 
 	function updateCanvas(text) {
 		input.value = text;
 		cols = textToColumns(text);
 		offset = 0;
-		drawLedFrame(canvas, cols, 0);
+		renderNow();
 	}
 
 	input.addEventListener('input', function() {
 		cols = textToColumns(input.value);
 		offset = 0;
-		drawLedFrame(canvas, cols, 0);
+		renderNow();
+	});
+
+	scrollToggle.addEventListener('change', function() {
+		offset = 0;
+		renderNow();
 	});
 
 	window.setInterval(function() {
-		if (cols.length > 27) {
+		if (scrollToggle.checked && cols.length > 27) {
 			offset = (offset + 1) % (cols.length + 8);
 			drawLedFrame(canvas, cols, offset);
 		}
 	}, 128);
 
-	drawLedFrame(canvas, cols, 0);
+	renderNow();
 
 	var presets = [
 		{ label: _('Time'), text: '12:34:56' },
-		{ label: _('Date'), text: '2026-10-13' },
+		{ label: _('Date (Static)'), text: '10-13' },
+		{ label: _('Date (Full)'), text: '2026-10-13' },
 		{ label: _('Lunar'), text: 'L:9.4' },
-		{ label: _('Sunrise/Sunset'), text: '06:12~18:45' },
+		{ label: _('Sunset (Static)'), text: 'S:18:45' },
+		{ label: _('Sunrise (Static)'), text: 'R:06:12' },
+		{ label: _('Sun (Full)'), text: '06:12~18:45' },
 		{ label: _('CPU'), text: 'C:12%' },
 		{ label: _('Memory'), text: 'M:35%' },
 		{ label: _('Temperature'), text: 'T:45.52' },
@@ -193,8 +225,9 @@ function buildPreviewBox() {
 		E('h3', {}, _('Screen Preview')),
 		E('div', { 'class': 'cbi-section-descr' },
 			_('Simulates the 27×5 LED matrix display in real-time. Supports digits, A-Z letters and symbols with amber glow effect.')),
-		E('div', { style: 'display:flex;align-items:center;flex-wrap:wrap' }, [
+		E('div', { style: 'display:flex;align-items:center;flex-wrap:wrap;gap:8px' }, [
 			input,
+			E('span', { style: 'display:inline-flex;align-items:center' }, [ scrollToggle, scrollLabel ]),
 			E('span', { class: 'cbi-value-description' }, _('Click preset buttons below or type custom text'))
 		]),
 		presetButtons,
@@ -263,6 +296,12 @@ return view.extend({
 		o.default = '5';
 		o.description = _('Duration each monitor page stays on screen before advancing to the next page.');
 
+		// 🌟 滚动开关：允许用户自由选择是否滚动
+		o = s.option(form.Flag, 'scroll_enable', _('Text Scrolling'));
+		o.default = '1';
+		o.rmempty = false;
+		o.description = _('Enable smooth scrolling for long text. When disabled, all monitor pages switch to compact static formats (e.g. MM-DD for date, S:HH:MM for sunset) to completely eliminate scrolling jitter.');
+
 		o = s.option(form.Value, 'net_interface', _('Traffic Monitor Interface'));
 		o.default = 'br-lan';
 		o.description = _('Network interface to monitor throughput for download and upload pages.');
@@ -295,6 +334,7 @@ return view.extend({
 		o = s.option(form.Value, 'scroll_ms', _('Scroll Interval (ms)'));
 		o.datatype = 'range(50,500)';
 		o.default = '128';
+		o.depends('scroll_enable', '1');
 		o.description = _('Frame step interval in milliseconds for scrolling text that exceeds 27 columns (default 128ms).');
 
 		o = s.option(form.Value, 'poll_ms', _('Sampling Interval (ms)'));

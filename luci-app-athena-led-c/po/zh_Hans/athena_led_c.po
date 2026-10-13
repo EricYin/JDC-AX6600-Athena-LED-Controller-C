@@ -37,20 +37,32 @@ msgstr "实时模拟真实 27×5 LED 点阵屏硬件显示效果。支持数字�
 msgid "Type text to preview..."
 msgstr "输入任意文本以实时预览..."
 
+msgid "Preview Scrolling"
+msgstr "模拟长文本滚动"
+
 msgid "Click preset buttons below or type custom text"
 msgstr "点击下方快捷按钮或在上框输入自定义内容"
 
 msgid "Time"
 msgstr "时钟"
 
-msgid "Date"
-msgstr "日期"
+msgid "Date (Static)"
+msgstr "日期 (静态)"
+
+msgid "Date (Full)"
+msgstr "日期 (完整)"
 
 msgid "Lunar"
 msgstr "农历"
 
-msgid "Sunrise/Sunset"
-msgstr "日出日落"
+msgid "Sunset (Static)"
+msgstr "日落时刻 (静态)"
+
+msgid "Sunrise (Static)"
+msgstr "日出时刻 (静态)"
+
+msgid "Sun (Full)"
+msgstr "日出日落 (完整)"
 
 msgid "CPU"
 msgstr "CPU"
@@ -117,6 +129,12 @@ msgstr "页面轮播停留时间 (秒)"
 
 msgid "Duration each monitor page stays on screen before advancing to the next page."
 msgstr "每个监控页面在屏幕上保持显示的时间（秒），到期后自动平滑轮播到下一项。"
+
+msgid "Text Scrolling"
+msgstr "长文本滚动"
+
+msgid "Enable smooth scrolling for long text. When disabled, all monitor pages switch to compact static formats (e.g. MM-DD for date, S:HH:MM for sunset) to completely eliminate scrolling jitter."
+msgstr "当显示内容超出屏幕宽度（27列）时是否平滑滚动。关闭后将采用紧凑静态格式显示（例如日期以 MM-DD 居中静止显示，日落显示 S:HH:MM），彻底消除滚动晃眼感。"
 
 msgid "Traffic Monitor Interface"
 msgstr "流量监控网卡接口"

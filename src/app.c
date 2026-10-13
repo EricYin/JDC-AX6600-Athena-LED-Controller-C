@@ -105,18 +105,22 @@ static int run_sim(const app_args_t *a)
         if (c == ' ') screen_on = !screen_on;
 
         monitor_poll(&mon);
-        page_render(page, &mon, a->sun_coords, text, sizeof(text));
+        page_render(page, &mon, a->sun_coords, a->no_scroll, text, sizeof(text));
         ncols = font_render(text, cols, COLS_MAX);
 
         uint8_t frame[FRAME_COLS];
         if (ncols > FRAME_COLS) {
-            /* smooth scrolling window */
-            unsigned windows = (unsigned)(ncols - FRAME_COLS) + 1;
-            size_t off = scroll_pos % windows;
-            memcpy(frame, cols + off, FRAME_COLS);
-            scroll_pos = (scroll_pos + 1) % windows;
-            /* brief pause at each end for readability */
-            if (off == 0 || off == windows - 1) sleep_ms(600);
+            if (a->no_scroll) {
+                memcpy(frame, cols, FRAME_COLS);
+            } else {
+                /* smooth scrolling window */
+                unsigned windows = (unsigned)(ncols - FRAME_COLS) + 1;
+                size_t off = scroll_pos % windows;
+                memcpy(frame, cols + off, FRAME_COLS);
+                scroll_pos = (scroll_pos + 1) % windows;
+                /* brief pause at each end for readability */
+                if (off == 0 || off == windows - 1) sleep_ms(600);
+            }
         } else {
             build_frame_centered(cols, ncols, frame);
         }
@@ -218,14 +222,18 @@ static int run_hw(const app_args_t *a)
         if (!screen_on) continue;
 
         monitor_poll(&mon);
-        page_render(page, &mon, a->sun_coords, text, sizeof(text));
+        page_render(page, &mon, a->sun_coords, a->no_scroll, text, sizeof(text));
         size_t ncols = font_render(text, cols, COLS_MAX);
 
         if (ncols > FRAME_COLS) {
-            unsigned windows = (unsigned)(ncols - FRAME_COLS) + 1;
-            size_t off = scroll_pos % windows;
-            memcpy(frame, cols + off, FRAME_COLS);
-            scroll_pos = (scroll_pos + 1) % windows;
+            if (a->no_scroll) {
+                memcpy(frame, cols, FRAME_COLS);
+            } else {
+                unsigned windows = (unsigned)(ncols - FRAME_COLS) + 1;
+                size_t off = scroll_pos % windows;
+                memcpy(frame, cols + off, FRAME_COLS);
+                scroll_pos = (scroll_pos + 1) % windows;
+            }
         } else {
             build_frame_centered(cols, ncols, frame);
         }

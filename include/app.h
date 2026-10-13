@@ -8,6 +8,7 @@ typedef struct {
     bool sim;               /* --sim / --test */
     bool no_clear;          /* --no-clear */
     bool self_test;         /* --self-test */
+    bool no_scroll;         /* --no-scroll: compact static display without scrolling */
     unsigned page_secs;     /* --page-secs, default 5 */
     unsigned scroll_ms;     /* --scroll-ms, default 128 */
     unsigned poll_ms;       /* --poll-ms, default 250 */

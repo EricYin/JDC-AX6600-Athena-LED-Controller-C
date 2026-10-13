@@ -3,6 +3,7 @@
 
 #include "monitor.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -19,9 +20,9 @@ typedef enum {
     PAGE_COUNT
 } page_id_t;
 
-/* Fill buf with the page's text. Text longer than the screen scrolls. */
+/* Fill buf with the page's text. When no_scroll is true, uses compact formats. */
 void page_render(page_id_t page, const monitor_t *mon,
-                 const char *sun_coords, char *buf, size_t len);
+                 const char *sun_coords, bool no_scroll, char *buf, size_t len);
 
 const char *page_name(page_id_t page);
 

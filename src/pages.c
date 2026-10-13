@@ -40,8 +40,14 @@ static bool parse_coords(const char *s, double *lat, double *lon)
     return true;
 }
 
+static void fmt_hour(double hours, char *buf, size_t len)
+{
+    long total = (long)(hours * 60.0 + 0.5) % (24 * 60);
+    snprintf(buf, len, "%ld:%02ld", total / 60, total % 60);
+}
+
 void page_render(page_id_t page, const monitor_t *mon,
-                 const char *sun_coords, char *buf, size_t len)
+                 const char *sun_coords, bool no_scroll, char *buf, size_t len)
 {
     struct tm tm;
     local_now(&tm);
@@ -60,8 +66,13 @@ void page_render(page_id_t page, const monitor_t *mon,
         break;
     }
     case PAGE_DATE:
-        snprintf(buf, len, "%04d-%02d-%02d",
-                 tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+        if (no_scroll) {
+            /* Compact date fits in 19 cols, perfectly centered statically */
+            snprintf(buf, len, "%02d-%02d", tm.tm_mon + 1, tm.tm_mday);
+        } else {
+            snprintf(buf, len, "%04d-%02d-%02d",
+                     tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+        }
         break;
     case PAGE_LUNAR:
         lunar_today(buf, len);
@@ -69,7 +80,23 @@ void page_render(page_id_t page, const monitor_t *mon,
     case PAGE_SUN: {
         double lat, lon;
         parse_coords(sun_coords, &lat, &lon);
-        sun_format(lat, lon, day_of_year(&tm), local_tz_hours(), buf, len);
+        double rise, set;
+        if (!sun_calc(lat, lon, day_of_year(&tm), local_tz_hours(), &rise, &set)) {
+            snprintf(buf, len, "SUN:--");
+        } else if (no_scroll) {
+            /* Compact single sun event fits in 21 cols, static without scrolling */
+            double now_h = (double)tm.tm_hour + (double)tm.tm_min / 60.0;
+            char hbuf[8];
+            if (now_h >= rise && now_h < set) {
+                fmt_hour(set, hbuf, sizeof(hbuf));
+                snprintf(buf, len, "S:%s", hbuf);
+            } else {
+                fmt_hour(rise, hbuf, sizeof(hbuf));
+                snprintf(buf, len, "R:%s", hbuf);
+            }
+        } else {
+            sun_format(lat, lon, day_of_year(&tm), local_tz_hours(), buf, len);
+        }
         break;
     }
     case PAGE_CPU:

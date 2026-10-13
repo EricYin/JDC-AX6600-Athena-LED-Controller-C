@@ -10,6 +10,7 @@ load_uci() {
 	config_get_bool enabled main enabled 1
 	config_get brightness main brightness 5
 	config_get page_secs main page_secs 5
+	config_get_bool scroll_enable main scroll_enable 1
 	config_get scroll_ms main scroll_ms 128
 	config_get poll_ms main poll_ms 250
 	config_get net_interface main net_interface br-lan
@@ -28,6 +29,7 @@ start_service() {
 		--poll-ms "$poll_ms" \
 		--net-interface "$net_interface" \
 		--sun-coords "$sun_coords"
+	[ "$scroll_enable" -eq 0 ] && procd_append_param command --no-scroll
 	procd_set_param pidfile /var/run/athena-led-c.pid
 	procd_set_param stdout 1
 	procd_set_param stderr 1

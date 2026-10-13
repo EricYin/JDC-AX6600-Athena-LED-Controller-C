@@ -14,6 +14,7 @@ static void usage(FILE *out)
 "Options:\n"
 "  --sim, --test             run terminal simulator (27x5, ■/·)\n"
 "  --no-clear                simulator: do not clear terminal each frame\n"
+"  --no-scroll               disable scrolling; use compact static formats\n"
 "  --page-secs N             seconds per page (default 5)\n"
 "  --scroll-ms N             scroll frame interval in ms (default 128)\n"
 "  --poll-ms N               system sampling interval in ms (default 250)\n"
@@ -34,6 +35,7 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
     a->brightness = 5;
     a->net_if = "br-lan";
     a->sun_coords = "";
+    a->no_scroll = false;
 
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
@@ -41,6 +43,8 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
             a->sim = true;
         } else if (strcmp(arg, "--no-clear") == 0) {
             a->no_clear = true;
+        } else if (strcmp(arg, "--no-scroll") == 0) {
+            a->no_scroll = true;
         } else if (strcmp(arg, "--self-test") == 0) {
             a->self_test = true;
         } else if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
