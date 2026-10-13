@@ -3,14 +3,13 @@
 'require form';
 'require fs';
 'require ui';
-'require uci';
 'require poll';
 'require network';
 
 /*
  * Athena LED Controller (C) — LuCI JS Settings View
  * For JDCloud AX6600 (RE-CS-02) Pure C LED Daemon
- * Single-screen static display, direct checkbox selection with live preview
+ * Single unified section, integrated preview with direct checkboxes, atomic save
  */
 
 function getServiceStatus() {
@@ -121,7 +120,7 @@ function drawLedFrame(canvas, cols) {
 	}
 }
 
-// 7 个纯本地功能项（无日出日落）
+// 8 个纯本地功能项（无日出日落）
 var PAGE_ITEMS = [
 	{ id: 'time',     label: _('Time'),        icon: '🕒', preview: '12:34:56' },
 	{ id: 'date',     label: _('Date'),        icon: '📅', preview: '10-13' },
@@ -156,8 +155,7 @@ function buildButtonHelpBox() {
 return view.extend({
 	load: function() {
 		return Promise.all([
-			network.getDevices().catch(function() { return []; }),
-			uci.load('athena-led-c')
+			network.getDevices().catch(function() { return []; })
 		]);
 	},
 
@@ -168,10 +166,8 @@ return view.extend({
 		m = new form.Map('athena-led-c', _('Athena LED Controller (C)'),
 			_('Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Single-screen static display, zero horizontal scrolling, lazy monitoring.'));
 
-		// ============================================================
-		// 板块 1: 屏幕点阵预览与显示功能勾选
-		// ============================================================
-		s = m.section(form.NamedSection, 'main', 'main', _('Screen Preview & Display Features'));
+		// 🌟 关键：整个页面只使用一个单一的 NamedSection 'main'，绝不拆成两个造成覆盖！
+		s = m.section(form.NamedSection, 'main', 'main', _('General Settings'));
 		s.addremove = false;
 
 		var previewCanvas = null;
@@ -182,30 +178,30 @@ return view.extend({
 			}
 		}
 
-		// 核心：绑定 pages 选项，自定义渲染控件与提交逻辑
-		o = s.option(form.DynamicList, 'pages', _('Display Pages'));
+		// ============================================================
+		// 1. 点阵预览与功能勾选（集成在卡片旁，直接绑定 pages）
+		// ============================================================
+		o = s.option(form.Value, 'pages', _('Display Pages'));
 		o.rmempty = false;
 
 		o.cfgvalue = function(section_id) {
-			var val = uci.get('athena-led-c', section_id, 'pages');
+			var val = this.map.data.get(this.map.config, section_id, 'pages');
 			if (val == null)
-				return ['time', 'temp', 'date'];
-			return Array.isArray(val) ? val : [val];
+				return ['time', 'date', 'lunar', 'cpu', 'mem', 'temp', 'net_down', 'net_up'];
+			return Array.isArray(val) ? val : String(val).split(/[\s,]+/);
 		};
 
 		o.renderWidget = function(section_id, option_index, cfgvalue) {
-			var self = this;
 			var selectedValues = Array.isArray(cfgvalue) ? cfgvalue : (cfgvalue ? [cfgvalue] : ['time', 'temp', 'date']);
 
 			var CELL = 12, PAD = 10;
 			var canvas = E('canvas', {
 				width: 27 * CELL + PAD * 2,
 				height: 5 * CELL + PAD * 2,
-				style: 'background:#1a1a1a;border-radius:8px;display:block;margin:6px 0 14px 0'
+				style: 'background:#1a1a1a;border-radius:8px;display:block;margin:6px 0 12px 0'
 			});
 			previewCanvas = canvas;
 
-			// 初始展示首个勾选项的点阵
 			var initialText = '12:34:56';
 			if (selectedValues.length > 0) {
 				for (var k = 0; k < PAGE_ITEMS.length; k++) {
@@ -217,9 +213,8 @@ return view.extend({
 			}
 			drawLedFrame(canvas, textToColumns(initialText));
 
-			// 组装带复选框的交互卡片
 			var cardsContainer = E('div', {
-				style: 'display:flex;flex-wrap:wrap;gap:10px;margin-top:6px'
+				style: 'display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;'
 			});
 
 			PAGE_ITEMS.forEach(function(item) {
@@ -229,7 +224,7 @@ return view.extend({
 					type: 'checkbox',
 					'data-page-id': item.id,
 					checked: isChecked,
-					style: 'margin-right:8px;transform:scale(1.2);cursor:pointer'
+					style: 'margin-right:8px;transform:scale(1.2);cursor:pointer;'
 				});
 
 				var card = E('label', {
@@ -240,8 +235,7 @@ return view.extend({
 					cb,
 					E('span', {
 						style: 'font-weight:500;font-size:13px;',
-						click: function(ev) {
-							// 点击文字只预览点阵，不额外触发两次 checkbox 事件
+						click: function() {
 							updatePreview(item.preview);
 						}
 					}, item.icon + ' ' + item.label + ' (' + item.preview + ')')
@@ -254,7 +248,7 @@ return view.extend({
 				cardsContainer.appendChild(card);
 			});
 
-			return E('div', { 'class': 'cbi-value-field' }, [
+			return E('div', {}, [
 				E('div', { style: 'margin-bottom:4px;font-size:12px;color:#6c757d' },
 					_('Simulates the 27×5 LED matrix in real-time. Check the boxes to select pages for rotation; click any label to preview its matrix.')),
 				canvas,
@@ -262,7 +256,7 @@ return view.extend({
 			]);
 		};
 
-		// 🌟 重写 formvalue：精准收集所有勾选的 checkbox 属性 data-page-id
+		// 🌟 核心：formvalue 从 DOM 精准收集所有选中的复选框
 		o.formvalue = function(section_id) {
 			var checked = [];
 			var cbs = document.querySelectorAll('input[type="checkbox"][data-page-id]');
@@ -273,18 +267,15 @@ return view.extend({
 			return checked.length > 0 ? checked : ['time'];
 		};
 
-		// 🌟 重写 write：将选中的数组原子写入 UCI 的 list pages 列表
+		// 🌟 核心：write 写入当前表单 Map 数据缓存
 		o.write = function(section_id, formvalue) {
 			var values = Array.isArray(formvalue) ? formvalue : (formvalue ? [formvalue] : ['time']);
-			return uci.set('athena-led-c', section_id, 'pages', values);
+			return this.map.data.set(this.map.config, section_id, 'pages', values);
 		};
 
 		// ============================================================
-		// 板块 2: 控制参数设置
+		// 2. 基础控制选项（同属一个 Section 'main'）
 		// ============================================================
-		s = m.section(form.NamedSection, 'main', 'main', _('General Settings'));
-		s.addremove = false;
-
 		o = s.option(form.Flag, 'enabled', _('Enabled'));
 		o.default = '1';
 		o.rmempty = false;
@@ -315,23 +306,14 @@ return view.extend({
 				o.value(name);
 		});
 
-		// ============================================================
-		// 板块 3: 高级调优
-		// ============================================================
-		s = m.section(form.NamedSection, 'main', 'main', _('Advanced Tuning'));
-		s.addremove = false;
-
 		o = s.option(form.Value, 'poll_ms', _('Sampling Interval (ms)'));
 		o.datatype = 'range(100,1000)';
 		o.default = '250';
 		o.description = _('Key scanning and sensor refresh interval in milliseconds (default 250ms).');
 
 		// ============================================================
-		// 板块 4: 服务操作
+		// 3. 服务操作按钮
 		// ============================================================
-		s = m.section(form.NamedSection, 'main', 'main', _('Service Control'));
-		s.addremove = false;
-
 		o = s.option(form.Button, '_restart', _('Restart Service'));
 		o.inputstyle = 'apply';
 		o.inputtitle = _('Restart');
@@ -348,7 +330,7 @@ return view.extend({
 		o.onclick = function() { return callInitAction('start'); };
 
 		// ============================================================
-		// 渲染视图与状态轮询
+		// 4. 渲染视图与状态轮询
 		// ============================================================
 		return m.render().then(function(mapEl) {
 			var statusText = E('em', {}, _('Collecting data...'));
