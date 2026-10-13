@@ -1,11 +1,4 @@
 # OpenWrt package definition for athena-led-c.
-#
-# Usage from an OpenWrt buildroot:
-#   ln -s /data00/repos/JDC-AX6600-Athena-LED-Controller-C/openwrt package/athena-led-c
-#   make package/athena-led-c/compile V=s
-#
-# The plain top-level Makefile of this repository is intentionally reused for
-# the actual build so the PC and OpenWrt build flows can never drift apart.
 
 include $(TOPDIR)/rules.mk
 
@@ -34,10 +27,6 @@ Chinese lunar calendar, sunrise/sunset, CPU/memory/temperature and
 per-interface throughput. Terminal simulator included (--sim).
 endef
 
-# Repo root locator: works both when this directory is symlinked into
-# package/ (sources live in ../) and when the whole repo is used as the
-# package dir (sources live in ./). Note: ./Makefile cannot be probed
-# directly because it exists in BOTH layouts (here it is the package file).
 REPO_ROOT := $(if $(wildcard ./src),.,..)
 
 define Build/Prepare
@@ -61,6 +50,8 @@ define Package/athena-led-c/install
 	$(INSTALL_BIN) ./files/athena-led-c.init $(1)/etc/init.d/athena-led-c
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/athena-led-c.config $(1)/etc/config/athena-led-c
+	$(INSTALL_DIR) $(1)/etc/rc.button
+	$(INSTALL_BIN) ./files/screen.button $(1)/etc/rc.button/screen
 endef
 
 $(eval $(call BuildPackage,athena-led-c))

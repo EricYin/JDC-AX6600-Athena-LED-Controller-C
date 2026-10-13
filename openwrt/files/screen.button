@@ -1,0 +1,11 @@
+#!/bin/sh
+PID=$(cat /var/run/athena-led-c.pid 2>/dev/null)
+[ -n "$PID" ] || exit 0
+
+if [ "$ACTION" = "released" ]; then
+    if [ "${SEEN:-0}" -ge 2 ]; then
+        kill -USR2 "$PID" 2>/dev/null || true
+    else
+        kill -USR1 "$PID" 2>/dev/null || true
+    fi
+fi

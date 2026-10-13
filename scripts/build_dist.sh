@@ -51,6 +51,9 @@ cp -f "${REPO_DIR}/openwrt/files/athena-led-c.init" "${TMP_IPK}/data/etc/init.d/
 chmod 755 "${TMP_IPK}/data/etc/init.d/athena-led-c"
 cp -f "${REPO_DIR}/openwrt/files/athena-led-c.config" "${TMP_IPK}/data/etc/config/athena-led-c"
 chmod 644 "${TMP_IPK}/data/etc/config/athena-led-c"
+mkdir -p "${TMP_IPK}/data/etc/rc.button"
+cp -f "${REPO_DIR}/openwrt/files/screen.button" "${TMP_IPK}/data/etc/rc.button/screen"
+chmod 755 "${TMP_IPK}/data/etc/rc.button/screen"
 
 cat << 'CPKG' > "${TMP_IPK}/control/control"
 Package: athena-led-c
@@ -138,6 +141,9 @@ cp -f "${REPO_DIR}/openwrt/files/athena-led-c.init" "${TMP_BUNDLE}/etc/init.d/at
 chmod 755 "${TMP_BUNDLE}/etc/init.d/athena-led-c"
 cp -f "${REPO_DIR}/openwrt/files/athena-led-c.config" "${TMP_BUNDLE}/etc/config/athena-led-c"
 chmod 644 "${TMP_BUNDLE}/etc/config/athena-led-c"
+mkdir -p "${TMP_BUNDLE}/etc/rc.button"
+cp -f "${REPO_DIR}/openwrt/files/screen.button" "${TMP_BUNDLE}/etc/rc.button/screen"
+chmod 755 "${TMP_BUNDLE}/etc/rc.button/screen"
 cp -f "${REPO_DIR}/luci-app-athena-led-c/htdocs/luci-static/resources/view/athena_led_c/settings.js" \
       "${TMP_BUNDLE}/www/luci-static/resources/view/athena_led_c/"
 cp -f "${REPO_DIR}/luci-app-athena-led-c/root/usr/share/luci/menu.d/luci-app-athena-led-c.json" \

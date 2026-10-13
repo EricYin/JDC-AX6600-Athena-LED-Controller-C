@@ -21,11 +21,18 @@
 #define FRAME_COLS 27
 
 static volatile sig_atomic_t g_running = 1;
+static volatile sig_atomic_t g_btn_short = 0;
+static volatile sig_atomic_t g_btn_toggle = 0;
 
 static void on_signal(int sig)
 {
-    (void)sig;
-    g_running = 0;
+    if (sig == SIGINT || sig == SIGTERM) {
+        g_running = 0;
+    } else if (sig == SIGUSR1) {
+        g_btn_short = 1;
+    } else if (sig == SIGUSR2) {
+        g_btn_toggle = 1;
+    }
 }
 
 static void install_signal_handlers(void)
@@ -35,6 +42,8 @@ static void install_signal_handlers(void)
     sa.sa_handler = on_signal;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
 }
 
 static long long monotonic_ms(void)
@@ -173,6 +182,14 @@ static int run_hw(const app_args_t *a)
             act = button_poll(&button, (int)a->poll_ms);
         else
             sleep_ms(a->poll_ms);
+
+        if (g_btn_short) {
+            g_btn_short = 0;
+            act = BUTTON_SHORT;
+        } else if (g_btn_toggle) {
+            g_btn_toggle = 0;
+            act = BUTTON_LONG;
+        }
 
         long long now = monotonic_ms();
         unsigned elapsed = (unsigned)(now - last_tick);
