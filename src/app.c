@@ -183,10 +183,14 @@ static int run_hw(const app_args_t *a)
         case BUTTON_SHORT:
             page_idx = (page_idx + 1) % a->num_pages;
             page_elapsed_ms = 0;
+            fprintf(stderr, "[button] SHORT click -> switch to page %s (%zu/%zu)\n",
+                    page_name(a->pages[page_idx]), page_idx + 1, a->num_pages);
             break;
         case BUTTON_DOUBLE:
             page_idx = 0;
             page_elapsed_ms = 0;
+            fprintf(stderr, "[button] DOUBLE click -> reset to page %s\n",
+                    page_name(a->pages[page_idx]));
             break;
         case BUTTON_LONG:
             screen_on = !screen_on;
@@ -196,6 +200,8 @@ static int run_hw(const app_args_t *a)
                 uint8_t blank[FRAME_COLS] = {0};
                 screen_write_frame(&screen, blank, 0);
             }
+            fprintf(stderr, "[button] LONG press -> screen power %s\n",
+                    screen_on ? "ON" : "OFF");
             break;
         default:
             break;

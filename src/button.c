@@ -1,21 +1,10 @@
-/*
- * Physical "screen" button driver.
- *
- * Primary backend: GPIO character-device line events (edge-triggered,
- * poll() based - zero CPU while the button is idle).
- * Fallback: sysfs input polled at 100ms for legacy firmware.
- *
- * Gestures:
- *   short press  -> next page
- *   double click -> first page
- *   long press   -> toggle screen power (>= 2s)
- */
 #include "button.h"
 
 #include <fcntl.h>
 #include <errno.h>
 #include <poll.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <time.h>
@@ -23,8 +12,8 @@
 
 #include <linux/gpio.h>
 
-#define LONG_PRESS_NS   (2LL * 1000000000LL)
-#define DOUBLECLICK_NS  (350LL * 1000000LL)
+#define LONG_PRESS_NS   (1500LL * 1000000LL) /* 1.5 seconds */
+#define DOUBLECLICK_NS  (350LL * 1000000LL)  /* 350 ms */
 
 static long long now_ns(void)
 {
@@ -33,25 +22,46 @@ static long long now_ns(void)
     return (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
-static bool sysfs_export_input(unsigned pin)
+static void sleep_ms_short(unsigned ms)
 {
-    int fd = open("/sys/class/gpio/export", O_WRONLY | O_CLOEXEC);
-    if (fd < 0) return false;
-    char buf[32];
-    int len = snprintf(buf, sizeof(buf), "%u", pin);
-    ssize_t n = write(fd, buf, (size_t)len);
-    int saved = errno;
-    close(fd);
-    /* EBUSY: pin already exported (e.g. procd restarted the daemon) - OK. */
-    if (n != len && saved != EBUSY) return false;
+    struct timespec ts = {
+        .tv_sec = ms / 1000,
+        .tv_nsec = (long)(ms % 1000) * 1000000L,
+    };
+    nanosleep(&ts, NULL);
+}
 
-    char path[96];
-    snprintf(path, sizeof(path), "/sys/class/gpio/gpio%u/direction", pin);
-    fd = open(path, O_WRONLY | O_CLOEXEC);
-    if (fd < 0) return false;
-    bool dir_ok = write(fd, "in", 2) == 2;
-    close(fd);
-    return dir_ok;
+static bool check_debugfs_pressed(int fd, unsigned pin, unsigned alt_pin)
+{
+    char buf[8192];
+    ssize_t n = pread(fd, buf, sizeof(buf) - 1, 0);
+    if (n <= 0) return false;
+    buf[n] = '\0';
+
+    unsigned pins[2] = { pin, alt_pin };
+    for (int i = 0; i < 2; i++) {
+        if (pins[i] == 0) continue;
+        char pat[32];
+        snprintf(pat, sizeof(pat), "gpio%u", pins[i]);
+        char *p = strstr(buf, pat);
+        if (!p) {
+            snprintf(pat, sizeof(pat), "gpio-%u", 512 + pins[i]);
+            p = strstr(buf, pat);
+        }
+        if (p) {
+            char line[128] = {0};
+            char *end = strchr(p, '\n');
+            if (end && (size_t)(end - p) < sizeof(line)) {
+                memcpy(line, p, (size_t)(end - p));
+            } else {
+                snprintf(line, sizeof(line), "%s", p);
+            }
+            /* Active-low: pressed if state contains "low" or "lo " */
+            if (strstr(line, " low") || strstr(line, " lo ") || strstr(line, " lo\t"))
+                return true;
+        }
+    }
+    return false;
 }
 
 bool button_init(button_t *b, unsigned gpio_pin)
@@ -59,18 +69,20 @@ bool button_init(button_t *b, unsigned gpio_pin)
     memset(b, 0, sizeof(*b));
     b->fd = -1;
     b->sysfs_value_fd = -1;
+    b->debugfs_fd = -1;
+    b->gpio_pin = gpio_pin;
+    b->alt_gpio_pin = BUTTON_ALT_PIN;
 
-    /* Try cdev line-event on the main SoC gpiochip. */
-    for (unsigned chip = 0; chip < 16; chip++) {
+    /* 1. Try cdev line-event */
+    for (unsigned chip = 0; chip < 4; chip++) {
         char path[32];
         snprintf(path, sizeof(path), "/dev/gpiochip%u", chip);
         int fd = open(path, O_RDONLY | O_CLOEXEC);
-        if (fd < 0) break;
+        if (fd < 0) continue;
 
         struct gpiochip_info info;
         memset(&info, 0, sizeof(info));
         if (ioctl(fd, GPIO_GET_CHIPINFO_IOCTL, &info) == 0 &&
-            (strstr(info.label, "pinctrl") || strstr(info.label, "tlmm")) &&
             gpio_pin < info.lines) {
 
             struct gpioevent_request req;
@@ -78,11 +90,10 @@ bool button_init(button_t *b, unsigned gpio_pin)
             req.lineoffset = gpio_pin;
             req.handleflags = GPIOHANDLE_REQUEST_INPUT;
             req.eventflags = GPIOEVENT_REQUEST_BOTH_EDGES;
-            snprintf(req.consumer_label, sizeof(req.consumer_label), "athena-led-c-btn");
+            snprintf(req.consumer_label, sizeof(req.consumer_label), "athena-btn");
 
             if (ioctl(fd, GPIO_GET_LINEEVENT_IOCTL, &req) == 0) {
                 close(fd);
-                /* Non-blocking: the drain loop below reads until EAGAIN. */
                 int flags = fcntl(req.fd, F_GETFL);
                 fcntl(req.fd, F_SETFL, flags | O_NONBLOCK);
                 b->fd = req.fd;
@@ -92,27 +103,44 @@ bool button_init(button_t *b, unsigned gpio_pin)
         close(fd);
     }
 
-    /* Fallback: sysfs input polling. */
-    if (!sysfs_export_input(gpio_pin)) return false;
-    char path[96];
-    snprintf(path, sizeof(path), "/sys/class/gpio/gpio%u/value", gpio_pin);
-    b->sysfs_value_fd = open(path, O_RDONLY | O_CLOEXEC);
-    return b->sysfs_value_fd >= 0;
+    /* 2. Try sysfs export (both pin and base+pin) */
+    unsigned candidates[2] = { 512 + gpio_pin, gpio_pin };
+    for (int i = 0; i < 2; i++) {
+        char path[96];
+        snprintf(path, sizeof(path), "/sys/class/gpio/gpio%u/value", candidates[i]);
+        int vfd = open(path, O_RDONLY | O_CLOEXEC);
+        if (vfd < 0) {
+            int efd = open("/sys/class/gpio/export", O_WRONLY | O_CLOEXEC);
+            if (efd >= 0) {
+                char s[16];
+                int l = snprintf(s, sizeof(s), "%u", candidates[i]);
+                write(efd, s, (size_t)l);
+                close(efd);
+            }
+            vfd = open(path, O_RDONLY | O_CLOEXEC);
+        }
+        if (vfd >= 0) {
+            b->sysfs_value_fd = vfd;
+            return true;
+        }
+    }
+
+    /* 3. Robust Fallback: debugfs parser (handles pins locked by gpio-keys/kernel drivers) */
+    int dfd = open("/sys/kernel/debug/gpio", O_RDONLY | O_CLOEXEC);
+    if (dfd >= 0) {
+        b->debugfs_fd = dfd;
+        return true;
+    }
+
+    return false;
 }
 
-/*
- * Edge-driven gesture state machine.
- * "gesture_done" marks that the current press already produced an action
- * (double click fires on the second press edge, long press fires while
- * held), so the matching release must not be reclassified as SHORT.
- */
 static void on_edge(button_t *b, bool pressed_now, button_action_t *out)
 {
     long long now = now_ns();
 
     if (pressed_now) {
         if (b->awaiting_double && now - b->release_ns < DOUBLECLICK_NS) {
-            /* second click inside the window: fire DOUBLE immediately */
             b->awaiting_double = false;
             b->gesture_done = true;
             *out = BUTTON_DOUBLE;
@@ -124,9 +152,9 @@ static void on_edge(button_t *b, bool pressed_now, button_action_t *out)
     } else {
         if (!b->pressed) return;
         b->pressed = false;
-        if (b->gesture_done) return; /* DOUBLE/LONG already delivered */
+        if (b->gesture_done) return;
         b->release_ns = now;
-        b->awaiting_double = true;   /* may still become a double click */
+        b->awaiting_double = true;
     }
 }
 
@@ -134,13 +162,11 @@ static button_action_t classify(button_t *b)
 {
     long long now = now_ns();
 
-    /* long press fires while still held (no release wait needed) */
     if (b->pressed && !b->gesture_done &&
         now - b->press_start_ns >= LONG_PRESS_NS) {
         b->gesture_done = true;
         return BUTTON_LONG;
     }
-    /* double-click window expired -> it was a single short press */
     if (b->awaiting_double && now - b->release_ns >= DOUBLECLICK_NS) {
         b->awaiting_double = false;
         return BUTTON_SHORT;
@@ -152,14 +178,13 @@ button_action_t button_poll(button_t *b, int timeout_ms)
 {
     button_action_t act = BUTTON_NONE;
 
-    /* cdev: edge events via poll(); zero CPU while the key is idle */
+    /* Backend 1: cdev */
     if (b->fd >= 0) {
         struct pollfd pfd = { .fd = b->fd, .events = POLLIN };
         int rc = poll(&pfd, 1, timeout_ms);
         if (rc > 0 && (pfd.revents & POLLIN)) {
             struct gpioevent_data ev;
-            ssize_t n;
-            while ((n = read(b->fd, &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
+            while (read(b->fd, &ev, sizeof(ev)) == (ssize_t)sizeof(ev)) {
                 if (ev.id == GPIOEVENT_EVENT_FALLING_EDGE)
                     on_edge(b, true, &act);
                 else if (ev.id == GPIOEVENT_EVENT_RISING_EDGE)
@@ -170,22 +195,51 @@ button_action_t button_poll(button_t *b, int timeout_ms)
         return act;
     }
 
-    /* sysfs fallback: read level each call; caller supplies cadence */
+    /* Backend 2: sysfs */
     if (b->sysfs_value_fd >= 0) {
         char c = '1';
         if (pread(b->sysfs_value_fd, &c, 1, 0) == 1) {
-            bool pressed_now = (c == '0'); /* active-low button */
+            bool pressed_now = (c == '0');
             if (pressed_now != b->pressed) on_edge(b, pressed_now, &act);
         }
+        if (act == BUTTON_NONE) act = classify(b);
+        sleep_ms_short((unsigned)timeout_ms);
+        return act;
     }
-    if (act == BUTTON_NONE) act = classify(b);
-    return act;
+
+    /* Backend 3: debugfs polling with responsive slices (50ms interval) */
+    if (b->debugfs_fd >= 0) {
+        int remaining = timeout_ms;
+        const int slice = 50; /* 50ms polling interval for instant touch feeling */
+        while (remaining > 0) {
+            bool pressed_now = check_debugfs_pressed(b->debugfs_fd, b->gpio_pin, b->alt_gpio_pin);
+            if (pressed_now != b->pressed)
+                on_edge(b, pressed_now, &act);
+
+            if (act == BUTTON_NONE)
+                act = classify(b);
+
+            if (act != BUTTON_NONE)
+                return act;
+
+            int step = remaining > slice ? slice : remaining;
+            sleep_ms_short((unsigned)step);
+            remaining -= step;
+        }
+        if (act == BUTTON_NONE) act = classify(b);
+        return act;
+    }
+
+    sleep_ms_short((unsigned)timeout_ms);
+    return BUTTON_NONE;
 }
 
 void button_close(button_t *b)
 {
     if (b->fd >= 0) close(b->fd);
     if (b->sysfs_value_fd >= 0) close(b->sysfs_value_fd);
+    if (b->debugfs_fd >= 0) close(b->debugfs_fd);
     b->fd = -1;
     b->sysfs_value_fd = -1;
+    b->debugfs_fd = -1;
 }
