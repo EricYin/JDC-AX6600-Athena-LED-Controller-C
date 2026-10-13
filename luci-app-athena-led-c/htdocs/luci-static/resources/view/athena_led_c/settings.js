@@ -9,7 +9,7 @@
 /*
  * Athena LED Controller (C) — LuCI JS Settings View
  * For JDCloud AX6600 (RE-CS-02) Pure C LED Daemon
- * Single unified section, integrated preview with direct checkboxes, atomic save
+ * Single-screen static display, direct checkbox selection with live preview
  */
 
 function getServiceStatus() {
@@ -166,7 +166,6 @@ return view.extend({
 		m = new form.Map('athena-led-c', _('Athena LED Controller (C)'),
 			_('Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Single-screen static display, zero horizontal scrolling, lazy monitoring.'));
 
-		// 🌟 关键：整个页面只使用一个单一的 NamedSection 'main'，绝不拆成两个造成覆盖！
 		s = m.section(form.NamedSection, 'main', 'main', _('General Settings'));
 		s.addremove = false;
 
@@ -183,16 +182,18 @@ return view.extend({
 		// ============================================================
 		o = s.option(form.Value, 'pages', _('Display Pages'));
 		o.rmempty = false;
-
-		o.cfgvalue = function(section_id) {
-			var val = this.map.data.get(this.map.config, section_id, 'pages');
-			if (val == null)
-				return ['time', 'date', 'lunar', 'cpu', 'mem', 'temp', 'net_down', 'net_up'];
-			return Array.isArray(val) ? val : String(val).split(/[\s,]+/);
-		};
+		o.forcewrite = true;
 
 		o.renderWidget = function(section_id, option_index, cfgvalue) {
-			var selectedValues = Array.isArray(cfgvalue) ? cfgvalue : (cfgvalue ? [cfgvalue] : ['time', 'temp', 'date']);
+			// 精确读取配置：如果未配置则默认全选，如果配置了则严格使用配置值
+			var selectedValues;
+			if (cfgvalue == null) {
+				selectedValues = ['time', 'date', 'lunar', 'cpu', 'mem', 'temp', 'net_down', 'net_up'];
+			} else if (Array.isArray(cfgvalue)) {
+				selectedValues = cfgvalue;
+			} else {
+				selectedValues = String(cfgvalue).split(/[\s,]+/);
+			}
 
 			var CELL = 12, PAD = 10;
 			var canvas = E('canvas', {
@@ -205,7 +206,7 @@ return view.extend({
 			var initialText = '12:34:56';
 			if (selectedValues.length > 0) {
 				for (var k = 0; k < PAGE_ITEMS.length; k++) {
-					if (PAGE_ITEMS[k].id === selectedValues[0]) {
+					if (selectedValues.indexOf(PAGE_ITEMS[k].id) !== -1) {
 						initialText = PAGE_ITEMS[k].preview;
 						break;
 					}
@@ -214,6 +215,7 @@ return view.extend({
 			drawLedFrame(canvas, textToColumns(initialText));
 
 			var cardsContainer = E('div', {
+				id: 'athena-led-pages-container',
 				style: 'display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;'
 			});
 
@@ -256,10 +258,11 @@ return view.extend({
 			]);
 		};
 
-		// 🌟 核心：formvalue 从 DOM 精准收集所有选中的复选框
+		// 🌟 精准从容器提取所有勾选状态的复选框
 		o.formvalue = function(section_id) {
+			var container = document.getElementById('athena-led-pages-container') || document;
 			var checked = [];
-			var cbs = document.querySelectorAll('input[type="checkbox"][data-page-id]');
+			var cbs = container.querySelectorAll('input[type="checkbox"][data-page-id]');
 			for (var i = 0; i < cbs.length; i++) {
 				if (cbs[i].checked)
 					checked.push(cbs[i].getAttribute('data-page-id'));
@@ -267,14 +270,14 @@ return view.extend({
 			return checked.length > 0 ? checked : ['time'];
 		};
 
-		// 🌟 核心：write 写入当前表单 Map 数据缓存
+		// 🌟 存入表单数据缓存
 		o.write = function(section_id, formvalue) {
 			var values = Array.isArray(formvalue) ? formvalue : (formvalue ? [formvalue] : ['time']);
 			return this.map.data.set(this.map.config, section_id, 'pages', values);
 		};
 
 		// ============================================================
-		// 2. 基础控制选项（同属一个 Section 'main'）
+		// 2. 基础控制选项
 		// ============================================================
 		o = s.option(form.Flag, 'enabled', _('Enabled'));
 		o.default = '1';
