@@ -21,7 +21,13 @@ typedef struct {
 } monitor_t;
 
 void monitor_init(monitor_t *m, const char *ifname);
-void monitor_poll(monitor_t *m); /* refresh deltas; CPU/net rates need >=2 calls */
+
+/* Lazy polling: poll ONLY the metric required by the current active page.
+ * If page is TIME, DATE, LUNAR, or SUN, performs ZERO file I/O or syscalls. */
+void monitor_poll_page(monitor_t *m, int page);
+
+/* Full poll (used for tests/diagnostics only) */
+void monitor_poll(monitor_t *m);
 
 /* Format helpers writing into caller-provided buffers. */
 void monitor_format_cpu(const monitor_t *m, char *buf, size_t len);

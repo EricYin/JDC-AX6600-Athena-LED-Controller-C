@@ -7,8 +7,8 @@ msgstr "雅典娜 LED (C版)"
 msgid "Athena LED Controller (C)"
 msgstr "京东云雅典娜 LED 点阵屏控制器 (纯 C 版)"
 
-msgid "Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Ultra-low resource usage, hardware TM1628A driver with local monitor pages."
-msgstr "专为京东云雅典娜 AX6600 (RE-CS-02) 打造的纯 C11 LED 控制守护进程。超低系统资源开销，原生 TM1628A 硬件驱动与全本地监控轮播。"
+msgid "Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Ultra-low resource usage, hardware TM1628A driver with on-demand lazy monitoring."
+msgstr "专为京东云雅典娜 AX6600 (RE-CS-02) 打造的纯 C11 LED 守护进程。极致超低系统开销，TM1628A 硬件驱动，单屏静态显示与按需惰性监控采样。"
 
 msgid "Running Status"
 msgstr "运行状态"
@@ -29,40 +29,31 @@ msgid "Service action \"%s\" executed successfully."
 msgstr "服务操作「%s」执行成功。"
 
 msgid "Screen Preview"
-msgstr "屏幕实时点阵预览"
+msgstr "屏幕点阵预览"
 
-msgid "Simulates the 27×5 LED matrix display in real-time. Supports digits, A-Z letters and symbols with amber glow effect."
-msgstr "实时模拟真实 27×5 LED 点阵屏硬件显示效果。支持数字、英文字母及符号，还原琥珀色发光与微光晕效果。"
+msgid "Simulates the 27×5 LED matrix display in real-time. Each display item occupies exactly one single screen (static centered, no scrolling)."
+msgstr "实时模拟真实 27×5 LED 点阵屏硬件显示效果。每个显示项严格只占一屏（居中静止显示，彻底去除横滚）。"
 
 msgid "Type text to preview..."
 msgstr "输入任意文本以实时预览..."
 
-msgid "Preview Scrolling"
-msgstr "模拟长文本滚动"
-
 msgid "Click preset buttons below or type custom text"
-msgstr "点击下方快捷按钮或在上框输入自定义内容"
+msgstr "点击下方快捷按钮或在输入框输入文本预览单屏点阵"
 
 msgid "Time"
 msgstr "时钟"
 
-msgid "Date (Static)"
-msgstr "日期 (静态)"
-
-msgid "Date (Full)"
-msgstr "日期 (完整)"
+msgid "Date"
+msgstr "日期"
 
 msgid "Lunar"
 msgstr "农历"
 
-msgid "Sunset (Static)"
-msgstr "日落时刻 (静态)"
+msgid "Sunset"
+msgstr "日落时刻"
 
-msgid "Sunrise (Static)"
-msgstr "日出时刻 (静态)"
-
-msgid "Sun (Full)"
-msgstr "日出日落 (完整)"
+msgid "Sunrise"
+msgstr "日出时刻"
 
 msgid "CPU"
 msgstr "CPU"
@@ -85,14 +76,14 @@ msgstr "机身物理按键手势说明"
 msgid "Single Click: "
 msgstr "单击屏幕按键："
 
-msgid "Switch to next monitoring page immediately."
-msgstr "立即切换至下一项监控页面。"
+msgid "Manually flip to the next checked page in the rotation list."
+msgstr "手动翻屏切换至下一个已勾选的显示页面。"
 
 msgid "Double Click: "
 msgstr "双击屏幕按键："
 
-msgid "Jump directly back to the primary Time page."
-msgstr "立即返回首页面（时钟）。"
+msgid "Jump directly back to the first checked page."
+msgstr "立即跳回第一个已勾选的页面。"
 
 msgid "Long Press (1.5s): "
 msgstr "长按屏幕按键 (1.5秒)："
@@ -124,17 +115,44 @@ msgstr " (默认)"
 msgid " (Brightest)"
 msgstr " (最亮)"
 
+msgid "Display Pages"
+msgstr "显示内容选择 (复选框)"
+
+msgid "Time (HH:MM:SS)"
+msgstr "时钟 (HH:MM:SS 冒号跳动)"
+
+msgid "Date (MM-DD)"
+msgstr "日期 (MM-DD 单屏静态)"
+
+msgid "Lunar Date (L:M.D)"
+msgstr "农历日期 (L:月.日 单屏静态)"
+
+msgid "Sunrise / Sunset (R: / S:)"
+msgstr "日出/日落时刻 (白天日落S / 夜晚日出R)"
+
+msgid "CPU Usage (C:%)"
+msgstr "CPU 使用率 (C:%)"
+
+msgid "Memory Usage (M:%)"
+msgstr "内存使用率 (M:%)"
+
+msgid "System Temperature (T:°C)"
+msgstr "系统温度 (T:CPU.NSS°C)"
+
+msgid "Download Speed (D:Bps)"
+msgstr "下行网速 (D:实时下载速率)"
+
+msgid "Upload Speed (U:Bps)"
+msgstr "上行网速 (U:实时上传速率)"
+
+msgid "Check the pages to display. If multiple pages are checked, the screen will switch between them. If only one is selected, it stays fixed on that page. Pages not currently displayed will NOT poll system metrics to save resources."
+msgstr "勾选要显示的内容。勾选多个时按顺序翻屏切换；只勾选一个时固定停留在该屏。未处于显示状态的内容（或未勾选的内容）后台绝不进行监控采样，彻底杜绝无用系统开销。"
+
 msgid "Page Display Time (seconds)"
-msgstr "页面轮播停留时间 (秒)"
+msgstr "页面停留时间 (秒)"
 
-msgid "Duration each monitor page stays on screen before advancing to the next page."
-msgstr "每个监控页面在屏幕上保持显示的时间（秒），到期后自动平滑轮播到下一项。"
-
-msgid "Text Scrolling"
-msgstr "长文本滚动"
-
-msgid "Enable smooth scrolling for long text. When disabled, all monitor pages switch to compact static formats (e.g. MM-DD for date, S:HH:MM for sunset) to completely eliminate scrolling jitter."
-msgstr "当显示内容超出屏幕宽度（27列）时是否平滑滚动。关闭后将采用紧凑静态格式显示（例如日期以 MM-DD 居中静止显示，日落显示 S:HH:MM），彻底消除滚动晃眼感。"
+msgid "Auto-rotation interval in seconds. Set to 0 to disable auto-rotation (manual switching via router button only). Greater than 0 enables automatic flipping."
+msgstr "页面自动轮播停留时间（秒）。设置为 0 则完全不自动翻屏，仅通过机身按键手动切页；大于 0 则自动定时翻屏。"
 
 msgid "Traffic Monitor Interface"
 msgstr "流量监控网卡接口"
@@ -178,17 +196,11 @@ msgstr "西安 (34.26, 108.94)"
 msgid "Advanced Tuning"
 msgstr "高级调优"
 
-msgid "Scroll Interval (ms)"
-msgstr "文字滚动步进间隔 (毫秒)"
-
-msgid "Frame step interval in milliseconds for scrolling text that exceeds 27 columns (default 128ms)."
-msgstr "当显示文本超过 27 列屏幕宽度时，平滑滚动的单步刷新毫秒数（默认 128ms）。"
-
 msgid "Sampling Interval (ms)"
-msgstr "硬件与数据采样间隔 (毫秒)"
+msgstr "采样与按键扫描周期 (毫秒)"
 
 msgid "System sensor sampling and button polling interval in milliseconds (default 250ms)."
-msgstr "CPU/内存/温度采集及按键边缘检测的轮询间隔（默认 250ms，idle 状态下由 poll 挂起不占 CPU）。"
+msgstr "按键边缘检测与当前活动页面的数据刷新周期（默认 250ms，idle 状态由 poll 挂起不占 CPU）。"
 
 msgid "Service Control"
 msgstr "服务操作"

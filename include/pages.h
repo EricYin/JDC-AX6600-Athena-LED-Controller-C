@@ -20,10 +20,11 @@ typedef enum {
     PAGE_COUNT
 } page_id_t;
 
-/* Fill buf with the page's text. When no_scroll is true, uses compact formats. */
+/* Render page text into buf. Always compact, strictly <= 27 cols. */
 void page_render(page_id_t page, const monitor_t *mon,
-                 const char *sun_coords, bool no_scroll, char *buf, size_t len);
+                 const char *sun_coords, char *buf, size_t len);
 
 const char *page_name(page_id_t page);
+page_id_t page_from_name(const char *name);
 
 #endif

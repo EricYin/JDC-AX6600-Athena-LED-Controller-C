@@ -47,7 +47,7 @@ static void fmt_hour(double hours, char *buf, size_t len)
 }
 
 void page_render(page_id_t page, const monitor_t *mon,
-                 const char *sun_coords, bool no_scroll, char *buf, size_t len)
+                 const char *sun_coords, char *buf, size_t len)
 {
     struct tm tm;
     local_now(&tm);
@@ -55,10 +55,8 @@ void page_render(page_id_t page, const monitor_t *mon,
     switch (page) {
     case PAGE_TIME: {
         /*
-         * Blinking colon, exactly 27 columns to fill the screen without
-         * scrolling: 6 digits x3 + 2 compact colons x1 + 7 gaps = 27.
-         * '^' is the 1-column compact colon; ' ' is the blank 1-column
-         * colon used for the blink-off phase.
+         * Blinking colon, exactly 27 columns (single screen, no scrolling):
+         * 6 digits x3 + 2 compact colons x1 + 7 gaps = 27.
          */
         char colon = (tm.tm_sec % 2 == 0) ? '^' : ' ';
         snprintf(buf, len, "%02d%c%02d^%02d",
@@ -66,15 +64,11 @@ void page_render(page_id_t page, const monitor_t *mon,
         break;
     }
     case PAGE_DATE:
-        if (no_scroll) {
-            /* Compact date fits in 19 cols, perfectly centered statically */
-            snprintf(buf, len, "%02d-%02d", tm.tm_mon + 1, tm.tm_mday);
-        } else {
-            snprintf(buf, len, "%04d-%02d-%02d",
-                     tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
-        }
+        /* Compact date MM-DD (19 cols, perfectly centered) */
+        snprintf(buf, len, "%02d-%02d", tm.tm_mon + 1, tm.tm_mday);
         break;
     case PAGE_LUNAR:
+        /* Lunar date L:M.D (17 cols, centered) */
         lunar_today(buf, len);
         break;
     case PAGE_SUN: {
@@ -83,8 +77,8 @@ void page_render(page_id_t page, const monitor_t *mon,
         double rise, set;
         if (!sun_calc(lat, lon, day_of_year(&tm), local_tz_hours(), &rise, &set)) {
             snprintf(buf, len, "SUN:--");
-        } else if (no_scroll) {
-            /* Compact single sun event fits in 21 cols, static without scrolling */
+        } else {
+            /* Daylight -> Sunset (S:HH:MM); Night -> Sunrise (R:HH:MM). 21 cols, centered. */
             double now_h = (double)tm.tm_hour + (double)tm.tm_min / 60.0;
             char hbuf[8];
             if (now_h >= rise && now_h < set) {
@@ -94,8 +88,6 @@ void page_render(page_id_t page, const monitor_t *mon,
                 fmt_hour(rise, hbuf, sizeof(hbuf));
                 snprintf(buf, len, "R:%s", hbuf);
             }
-        } else {
-            sun_format(lat, lon, day_of_year(&tm), local_tz_hours(), buf, len);
         }
         break;
     }
@@ -124,8 +116,23 @@ const char *page_name(page_id_t page)
 {
     static const char *names[PAGE_COUNT] = {
         "time", "date", "lunar", "sun",
-        "cpu", "mem", "temp", "net-down", "net-up"
+        "cpu", "mem", "temp", "net_down", "net_up"
     };
     if ((int)page < 0 || page >= PAGE_COUNT) return "?";
     return names[page];
+}
+
+page_id_t page_from_name(const char *name)
+{
+    if (!name || !*name) return PAGE_TIME;
+    if (strcmp(name, "time") == 0) return PAGE_TIME;
+    if (strcmp(name, "date") == 0) return PAGE_DATE;
+    if (strcmp(name, "lunar") == 0) return PAGE_LUNAR;
+    if (strcmp(name, "sun") == 0) return PAGE_SUN;
+    if (strcmp(name, "cpu") == 0) return PAGE_CPU;
+    if (strcmp(name, "mem") == 0) return PAGE_MEM;
+    if (strcmp(name, "temp") == 0) return PAGE_TEMP;
+    if (strcmp(name, "net_down") == 0 || strcmp(name, "net-down") == 0) return PAGE_NET_DOWN;
+    if (strcmp(name, "net_up") == 0 || strcmp(name, "net-up") == 0) return PAGE_NET_UP;
+    return PAGE_TIME;
 }

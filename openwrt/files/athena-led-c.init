@@ -9,12 +9,17 @@ load_uci() {
 	config_load athena-led-c
 	config_get_bool enabled main enabled 1
 	config_get brightness main brightness 5
-	config_get page_secs main page_secs 5
-	config_get_bool scroll_enable main scroll_enable 1
-	config_get scroll_ms main scroll_ms 128
+	config_get page_secs main page_secs 0
 	config_get poll_ms main poll_ms 250
 	config_get net_interface main net_interface br-lan
 	config_get sun_coords main sun_coords '39.90,116.40'
+
+	pages_list=""
+	append_page() {
+		[ -n "$1" ] && pages_list="${pages_list}${pages_list:+,}$1"
+	}
+	config_list_foreach main pages append_page
+	[ -z "$pages_list" ] && pages_list="time"
 }
 
 start_service() {
@@ -25,11 +30,10 @@ start_service() {
 	procd_set_param command "$PROG" \
 		--brightness "$brightness" \
 		--page-secs "$page_secs" \
-		--scroll-ms "$scroll_ms" \
 		--poll-ms "$poll_ms" \
 		--net-interface "$net_interface" \
-		--sun-coords "$sun_coords"
-	[ "$scroll_enable" -eq 0 ] && procd_append_param command --no-scroll
+		--sun-coords "$sun_coords" \
+		--pages "$pages_list"
 	procd_set_param pidfile /var/run/athena-led-c.pid
 	procd_set_param stdout 1
 	procd_set_param stderr 1

@@ -9,6 +9,7 @@
 /*
  * Athena LED Controller (C) — LuCI JS Settings View
  * For JDCloud AX6600 (RE-CS-02) Pure C LED Daemon
+ * Single-screen static display, multi-page selection, zero idle polling
  */
 
 // Service status query: check PID file first, then verify cmdline, fallback to pidof
@@ -51,8 +52,7 @@ function callInitAction(action) {
 	});
 }
 
-// 27×5 LED Matrix Preview Simulation
-// Bit 0 = top row, bit 4 = bottom row
+// 27×5 LED Matrix Preview Simulation (Single Screen, Static Centered)
 var CHAR_DICT = {
 	'0': [31, 17, 31], '1': [17, 31, 16], '2': [25, 21, 19], '3': [17, 21, 31],
 	'4': [7, 4, 31],   '5': [23, 21, 29], '6': [31, 21, 29], '7': [1, 1, 31],
@@ -70,12 +70,7 @@ var CHAR_DICT = {
 	'+': [4, 14, 4], '*': [10, 4, 10], '/': [24, 6, 1], '\\': [1, 6, 24],
 	'.': [16], ',': [16, 8], ':': [0, 10, 0], ';': [0, 0, 0], '^': [10],
 	'℃': [3, 0, 14, 17, 17], '~': [8, 16, 8], '%': [25, 8, 19],
-	'?': [1, 21, 3], '(': [14, 17], ')': [17, 14],
-	'↑': [4, 14, 4, 4, 4], '↓': [4, 4, 4, 14, 4],
-
-	'☀': [4, 21, 14, 21, 4], '☼': [17, 10, 4, 10, 17],
-	'☂': [23, 3, 23, 3, 23], '☔': [11, 3, 11, 3, 11],
-	'☁': [6, 15, 15, 6, 0], '⚡': [3, 6, 28, 8, 16]
+	'?': [1, 21, 3], '(': [14, 17], ')': [17, 14]
 };
 
 function textToColumns(text) {
@@ -92,7 +87,7 @@ function textToColumns(text) {
 	return cols;
 }
 
-function drawLedFrame(canvas, cols, scrollOffset) {
+function drawLedFrame(canvas, cols) {
 	var ctx = canvas.getContext('2d');
 	var CELL = 12, DOT = 4.2, PAD = 10;
 	var frame = new Array(27).fill(0);
@@ -101,13 +96,9 @@ function drawLedFrame(canvas, cols, scrollOffset) {
 		var off = Math.floor((27 - cols.length) / 2);
 		for (var i = 0; i < cols.length; i++)
 			frame[off + i] = cols[i];
-	} else if (scrollOffset < 0) {
-		// Static mode without scrolling: show first 27 columns locked
+	} else {
 		for (var k = 0; k < 27; k++)
 			frame[k] = cols[k] || 0;
-	} else {
-		for (var j = 0; j < 27; j++)
-			frame[j] = cols[(scrollOffset + j) % (cols.length + 8)] || 0;
 	}
 
 	ctx.fillStyle = '#1a1a1a';
@@ -146,64 +137,27 @@ function buildPreviewBox() {
 		placeholder: _('Type text to preview...')
 	});
 
-	var scrollToggle = E('input', {
-		type: 'checkbox',
-		id: 'preview_scroll_toggle',
-		checked: true,
-		style: 'margin-right:5px;vertical-align:middle'
-	});
-
-	var scrollLabel = E('label', {
-		for: 'preview_scroll_toggle',
-		style: 'font-size:13px;cursor:pointer;margin-right:12px;user-select:none'
-	}, _('Preview Scrolling'));
-
 	var cols = textToColumns(input.value);
-	var offset = 0;
-
-	function renderNow() {
-		if (scrollToggle.checked) {
-			drawLedFrame(canvas, cols, offset);
-		} else {
-			drawLedFrame(canvas, cols, -1);
-		}
-	}
 
 	function updateCanvas(text) {
 		input.value = text;
 		cols = textToColumns(text);
-		offset = 0;
-		renderNow();
+		drawLedFrame(canvas, cols);
 	}
 
 	input.addEventListener('input', function() {
 		cols = textToColumns(input.value);
-		offset = 0;
-		renderNow();
+		drawLedFrame(canvas, cols);
 	});
 
-	scrollToggle.addEventListener('change', function() {
-		offset = 0;
-		renderNow();
-	});
-
-	window.setInterval(function() {
-		if (scrollToggle.checked && cols.length > 27) {
-			offset = (offset + 1) % (cols.length + 8);
-			drawLedFrame(canvas, cols, offset);
-		}
-	}, 128);
-
-	renderNow();
+	drawLedFrame(canvas, cols);
 
 	var presets = [
 		{ label: _('Time'), text: '12:34:56' },
-		{ label: _('Date (Static)'), text: '10-13' },
-		{ label: _('Date (Full)'), text: '2026-10-13' },
+		{ label: _('Date'), text: '10-13' },
 		{ label: _('Lunar'), text: 'L:9.4' },
-		{ label: _('Sunset (Static)'), text: 'S:18:45' },
-		{ label: _('Sunrise (Static)'), text: 'R:06:12' },
-		{ label: _('Sun (Full)'), text: '06:12~18:45' },
+		{ label: _('Sunset'), text: 'S:18:45' },
+		{ label: _('Sunrise'), text: 'R:06:12' },
 		{ label: _('CPU'), text: 'C:12%' },
 		{ label: _('Memory'), text: 'M:35%' },
 		{ label: _('Temperature'), text: 'T:45.52' },
@@ -224,10 +178,9 @@ function buildPreviewBox() {
 	return E('div', { 'class': 'cbi-section' }, [
 		E('h3', {}, _('Screen Preview')),
 		E('div', { 'class': 'cbi-section-descr' },
-			_('Simulates the 27×5 LED matrix display in real-time. Supports digits, A-Z letters and symbols with amber glow effect.')),
+			_('Simulates the 27×5 LED matrix display in real-time. Each display item occupies exactly one single screen (static centered, no scrolling).')),
 		E('div', { style: 'display:flex;align-items:center;flex-wrap:wrap;gap:8px' }, [
 			input,
-			E('span', { style: 'display:inline-flex;align-items:center' }, [ scrollToggle, scrollLabel ]),
 			E('span', { class: 'cbi-value-description' }, _('Click preset buttons below or type custom text'))
 		]),
 		presetButtons,
@@ -241,11 +194,11 @@ function buildButtonHelpBox() {
 		E('div', { 'class': 'cbi-section-descr' }, [
 			E('p', { style: 'margin:4px 0' }, [
 				E('strong', {}, _('Single Click: ')),
-				_('Switch to next monitoring page immediately.')
+				_('Manually flip to the next checked page in the rotation list.')
 			]),
 			E('p', { style: 'margin:4px 0' }, [
 				E('strong', {}, _('Double Click: ')),
-				_('Jump directly back to the primary Time page.')
+				_('Jump directly back to the first checked page.')
 			]),
 			E('p', { style: 'margin:4px 0' }, [
 				E('strong', {}, _('Long Press (1.5s): ')),
@@ -267,10 +220,10 @@ return view.extend({
 		var m, s, o;
 
 		m = new form.Map('athena-led-c', _('Athena LED Controller (C)'),
-			_('Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Ultra-low resource usage, hardware TM1628A driver with local monitor pages.'));
+			_('Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Ultra-low resource usage, hardware TM1628A driver with on-demand lazy monitoring.'));
 
 		// ============================================================
-		// 板块 1: 基础设置
+		// 板块 1: 基本设置
 		// ============================================================
 		s = m.section(form.NamedSection, 'main', 'main', _('General Settings'));
 		s.addremove = false;
@@ -291,16 +244,26 @@ return view.extend({
 		}
 		o.description = _('Panel brightness level (0 to 7).');
 
-		o = s.option(form.Value, 'page_secs', _('Page Display Time (seconds)'));
-		o.datatype = 'range(1,60)';
-		o.default = '5';
-		o.description = _('Duration each monitor page stays on screen before advancing to the next page.');
+		// 🌟 核心需求：复选框选择显示内容，选中的才显示
+		o = s.option(form.MultiValue, 'pages', _('Display Pages'));
+		o.widget = 'checkbox';
+		o.value('time', _('Time (HH:MM:SS)'));
+		o.value('date', _('Date (MM-DD)'));
+		o.value('lunar', _('Lunar Date (L:M.D)'));
+		o.value('sun', _('Sunrise / Sunset (R: / S:)'));
+		o.value('cpu', _('CPU Usage (C:%)'));
+		o.value('mem', _('Memory Usage (M:%)'));
+		o.value('temp', _('System Temperature (T:°C)'));
+		o.value('net_down', _('Download Speed (D:Bps)'));
+		o.value('net_up', _('Upload Speed (U:Bps)'));
+		o.default = ['time'];
+		o.description = _('Check the pages to display. If multiple pages are checked, the screen will switch between them. If only one is selected, it stays fixed on that page. Pages not currently displayed will NOT poll system metrics to save resources.');
 
-		// 🌟 滚动开关：允许用户自由选择是否滚动
-		o = s.option(form.Flag, 'scroll_enable', _('Text Scrolling'));
-		o.default = '1';
-		o.rmempty = false;
-		o.description = _('Enable smooth scrolling for long text. When disabled, all monitor pages switch to compact static formats (e.g. MM-DD for date, S:HH:MM for sunset) to completely eliminate scrolling jitter.');
+		// 🌟 核心需求：停留时间为 0 则不自动轮播，只能手动按键翻屏
+		o = s.option(form.Value, 'page_secs', _('Page Display Time (seconds)'));
+		o.datatype = 'uinteger';
+		o.default = '0';
+		o.description = _('Auto-rotation interval in seconds. Set to 0 to disable auto-rotation (manual switching via router button only). Greater than 0 enables automatic flipping.');
 
 		o = s.option(form.Value, 'net_interface', _('Traffic Monitor Interface'));
 		o.default = 'br-lan';
@@ -330,12 +293,6 @@ return view.extend({
 		// ============================================================
 		s = m.section(form.NamedSection, 'main', 'main', _('Advanced Tuning'));
 		s.addremove = false;
-
-		o = s.option(form.Value, 'scroll_ms', _('Scroll Interval (ms)'));
-		o.datatype = 'range(50,500)';
-		o.default = '128';
-		o.depends('scroll_enable', '1');
-		o.description = _('Frame step interval in milliseconds for scrolling text that exceeds 27 columns (default 128ms).');
 
 		o = s.option(form.Value, 'poll_ms', _('Sampling Interval (ms)'));
 		o.datatype = 'range(100,1000)';

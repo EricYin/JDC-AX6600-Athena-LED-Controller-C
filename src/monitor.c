@@ -5,11 +5,11 @@
 #include <string.h>
 #include <time.h>
 
-#define MONITOR_STRIDE_MS 1000
-
 static char g_ifname[64] = "br-lan";
-static struct timespec g_last;
-static bool g_have_last;
+static struct timespec g_last_cpu;
+static bool g_have_last_cpu;
+static struct timespec g_last_net;
+static bool g_have_last_net;
 
 static int read_int_file(const char *path)
 {
@@ -61,7 +61,6 @@ static bool read_net(const char *iface, uint64_t *rx, uint64_t *tx)
         char *colon = strchr(line, ':');
         if (!colon) continue;
         *colon = '\0';
-        /* /proc/net/dev pads interface names with leading spaces. */
         char *name = line;
         while (isspace((unsigned char)*name)) name++;
         if (strcmp(name, iface) != 0) continue;
@@ -85,54 +84,102 @@ static double elapsed_sec(const struct timespec *a, const struct timespec *b)
 void monitor_init(monitor_t *m, const char *ifname)
 {
     memset(m, 0, sizeof(*m));
-    snprintf(g_ifname, sizeof(g_ifname), "%s", ifname);
-    m->temp_cpu_mc = read_int_file("/sys/class/thermal/thermal_zone4/temp");
-    m->temp_nss_mc = read_int_file("/sys/class/thermal/thermal_zone0/temp");
-    read_cpu(&m->cpu_total, &m->cpu_idle);
-    read_mem(&m->mem_total_kb, &m->mem_available_kb);
-    read_net(g_ifname, &m->rx_bytes, &m->tx_bytes);
-    clock_gettime(CLOCK_MONOTONIC, &g_last);
-    g_have_last = true;
+    if (ifname && *ifname)
+        snprintf(g_ifname, sizeof(g_ifname), "%s", ifname);
+    else
+        strcpy(g_ifname, "br-lan");
+    g_have_last_cpu = false;
+    g_have_last_net = false;
 }
 
-void monitor_poll(monitor_t *m)
+static void poll_cpu(monitor_t *m)
 {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    double dt = g_have_last ? elapsed_sec(&g_last, &now) : 0.0;
-
     uint64_t total, idle;
-    if (read_cpu(&total, &idle) && dt > 0 && total >= m->cpu_total) {
-        uint64_t d_total = total - m->cpu_total;
-        uint64_t d_idle  = idle - m->cpu_idle;
-        m->cpu_percent = d_total ? 100.0 * (double)(d_total - d_idle) / (double)d_total : 0;
+    if (read_cpu(&total, &idle)) {
+        if (g_have_last_cpu) {
+            double dt = elapsed_sec(&g_last_cpu, &now);
+            if (dt > 0 && total >= m->cpu_total) {
+                uint64_t d_total = total - m->cpu_total;
+                uint64_t d_idle  = idle - m->cpu_idle;
+                m->cpu_percent = d_total ? 100.0 * (double)(d_total - d_idle) / (double)d_total : 0.0;
+            }
+        }
         m->cpu_total = total;
         m->cpu_idle = idle;
+        g_last_cpu = now;
+        g_have_last_cpu = true;
     }
+}
 
+static void poll_mem(monitor_t *m)
+{
     uint64_t total_kb, avail_kb;
     if (read_mem(&total_kb, &avail_kb)) {
         m->mem_total_kb = total_kb;
         m->mem_available_kb = avail_kb;
         m->mem_percent = total_kb ?
-            100.0 * (double)(total_kb - avail_kb) / (double)total_kb : 0;
+            100.0 * (double)(total_kb - avail_kb) / (double)total_kb : 0.0;
     }
+}
 
+static void poll_temp(monitor_t *m)
+{
     int cpu_mc = read_int_file("/sys/class/thermal/thermal_zone4/temp");
     int nss_mc = read_int_file("/sys/class/thermal/thermal_zone0/temp");
     if (cpu_mc >= 0) m->temp_cpu_mc = cpu_mc;
     if (nss_mc >= 0) m->temp_nss_mc = nss_mc;
+}
 
+static void poll_net(monitor_t *m)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
     uint64_t rx, tx;
-    if (read_net(g_ifname, &rx, &tx) && dt > 0 && rx >= m->rx_bytes) {
-        m->rx_bps = (double)(rx - m->rx_bytes) * 8.0 / dt;
-        m->tx_bps = (double)(tx - m->tx_bytes) * 8.0 / dt;
+    if (read_net(g_ifname, &rx, &tx)) {
+        if (g_have_last_net) {
+            double dt = elapsed_sec(&g_last_net, &now);
+            if (dt > 0 && rx >= m->rx_bytes) {
+                m->rx_bps = (double)(rx - m->rx_bytes) * 8.0 / dt;
+                m->tx_bps = (double)(tx - m->tx_bytes) * 8.0 / dt;
+            }
+        }
         m->rx_bytes = rx;
         m->tx_bytes = tx;
+        g_last_net = now;
+        g_have_last_net = true;
     }
+}
 
-    g_last = now;
-    g_have_last = true;
+void monitor_poll_page(monitor_t *m, int page)
+{
+    switch (page) {
+    case 4: /* PAGE_CPU */
+        poll_cpu(m);
+        break;
+    case 5: /* PAGE_MEM */
+        poll_mem(m);
+        break;
+    case 6: /* PAGE_TEMP */
+        poll_temp(m);
+        break;
+    case 7: /* PAGE_NET_DOWN */
+    case 8: /* PAGE_NET_UP */
+        poll_net(m);
+        break;
+    default:
+        /* TIME, DATE, LUNAR, SUN: zero file I/O, zero syscalls! */
+        break;
+    }
+}
+
+void monitor_poll(monitor_t *m)
+{
+    poll_cpu(m);
+    poll_mem(m);
+    poll_temp(m);
+    poll_net(m);
 }
 
 void monitor_format_cpu(const monitor_t *m, char *buf, size_t len)
