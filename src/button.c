@@ -31,35 +31,31 @@ static void sleep_ms_short(unsigned ms)
     nanosleep(&ts, NULL);
 }
 
-static bool check_debugfs_pressed(int fd, unsigned pin, unsigned alt_pin)
+static bool check_debugfs_pressed(int fd, unsigned pin)
 {
     char buf[8192];
     ssize_t n = pread(fd, buf, sizeof(buf) - 1, 0);
     if (n <= 0) return false;
     buf[n] = '\0';
 
-    unsigned pins[2] = { pin, alt_pin };
-    for (int i = 0; i < 2; i++) {
-        if (pins[i] == 0) continue;
-        char pat[32];
-        snprintf(pat, sizeof(pat), "gpio%u", pins[i]);
-        char *p = strstr(buf, pat);
-        if (!p) {
-            snprintf(pat, sizeof(pat), "gpio-%u", 512 + pins[i]);
-            p = strstr(buf, pat);
+    char pat[32];
+    snprintf(pat, sizeof(pat), "gpio%u", pin);
+    char *p = strstr(buf, pat);
+    if (!p) {
+        snprintf(pat, sizeof(pat), "gpio-%u", 512 + pin);
+        p = strstr(buf, pat);
+    }
+    if (p) {
+        char line[128] = {0};
+        char *end = strchr(p, '\n');
+        if (end && (size_t)(end - p) < sizeof(line)) {
+            memcpy(line, p, (size_t)(end - p));
+        } else {
+            snprintf(line, sizeof(line), "%s", p);
         }
-        if (p) {
-            char line[128] = {0};
-            char *end = strchr(p, '\n');
-            if (end && (size_t)(end - p) < sizeof(line)) {
-                memcpy(line, p, (size_t)(end - p));
-            } else {
-                snprintf(line, sizeof(line), "%s", p);
-            }
-            /* Active-low: pressed if state contains "low" or "lo " */
-            if (strstr(line, " low") || strstr(line, " lo ") || strstr(line, " lo\t"))
-                return true;
-        }
+        /* Active-low: pressed if state contains "low" or "lo " */
+        if (strstr(line, " low") || strstr(line, " lo ") || strstr(line, " lo\t"))
+            return true;
     }
     return false;
 }
@@ -71,7 +67,6 @@ bool button_init(button_t *b, unsigned gpio_pin)
     b->sysfs_value_fd = -1;
     b->debugfs_fd = -1;
     b->gpio_pin = gpio_pin;
-    b->alt_gpio_pin = BUTTON_ALT_PIN;
 
     /* 1. Try cdev line-event */
     for (unsigned chip = 0; chip < 4; chip++) {
@@ -125,7 +120,7 @@ bool button_init(button_t *b, unsigned gpio_pin)
         }
     }
 
-    /* 3. Robust Fallback: debugfs parser (handles pins locked by gpio-keys/kernel drivers) */
+    /* 3. Robust Fallback: debugfs parser */
     int dfd = open("/sys/kernel/debug/gpio", O_RDONLY | O_CLOEXEC);
     if (dfd >= 0) {
         b->debugfs_fd = dfd;
@@ -207,12 +202,12 @@ button_action_t button_poll(button_t *b, int timeout_ms)
         return act;
     }
 
-    /* Backend 3: debugfs polling with responsive slices (50ms interval) */
+    /* Backend 3: debugfs polling (50ms slice) */
     if (b->debugfs_fd >= 0) {
         int remaining = timeout_ms;
-        const int slice = 50; /* 50ms polling interval for instant touch feeling */
+        const int slice = 50;
         while (remaining > 0) {
-            bool pressed_now = check_debugfs_pressed(b->debugfs_fd, b->gpio_pin, b->alt_gpio_pin);
+            bool pressed_now = check_debugfs_pressed(b->debugfs_fd, b->gpio_pin);
             if (pressed_now != b->pressed)
                 on_edge(b, pressed_now, &act);
 
