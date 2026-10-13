@@ -13,13 +13,13 @@ define Package/$(PKG_NAME)
 	SECTION:=luci
 	CATEGORY:=LuCI
 	SUBMENU:=3. Applications
-	TITLE:=LuCI Support for Athena LED (Pure C daemon)
+	TITLE:=LuCI Support for Athena LED
 	DEPENDS:=+athena-led-c +luci-base
 	PKGARCH:=all
 endef
 
 define Package/$(PKG_NAME)/description
-Web UI for the JDCloud AX6600 (Athena) LED screen pure C daemon.
+Web UI for the JDCloud AX6600 (Athena) LED screen controller.
 Features 27x5 HTML5 canvas live matrix preview, brightness control,
 polling and page duration configuration, and Chinese i18n support.
 endef

@@ -69,19 +69,34 @@ static void build_frame_centered(const uint8_t *cols, size_t n, uint8_t out[FRAM
     }
 }
 
-static uint8_t indicator_status(const monitor_t *mon)
+static uint8_t indicator_status(const monitor_t *mon, const app_args_t *a)
 {
     uint8_t s = 0;
-    if (mon->cpu_percent > 5.0) s |= LED_CLOCK_BIT;
-    if (mon->rx_bps > 1.0) s |= LED_DOWN_BIT;
-    if (mon->tx_bps > 1.0) s |= LED_UP_BIT;
+    if (mon->cpu_percent > a->indicator_cpu_percent)
+        s |= LED_CLOCK_BIT;
+    if (mon->rx_bytes_per_sec > a->indicator_net_kbytes * 1000.0)
+        s |= LED_DOWN_BIT;
+    if (mon->tx_bytes_per_sec > a->indicator_net_kbytes * 1000.0)
+        s |= LED_UP_BIT;
     return s;
+}
+
+/* Aggregate all pages chosen through --pages/UCI. Metrics for unchecked pages
+ * remain completely unpolled; checked metrics keep updating while any other
+ * page is displayed so the discrete indicator LEDs never retain stale values. */
+static unsigned selected_poll_mask(const app_args_t *a)
+{
+    unsigned mask = 0;
+    for (size_t i = 0; i < a->num_pages; i++)
+        mask |= monitor_poll_mask_page(a->pages[i]);
+    return mask;
 }
 
 static int run_sim(const app_args_t *a)
 {
     monitor_t mon;
     monitor_init(&mon, a->net_if);
+    monitor_set_net_smoothing_seconds(&mon, a->net_smoothing_secs);
 
     sim_set_clear(!a->no_clear);
     sim_input_init();
@@ -90,6 +105,7 @@ static int run_sim(const app_args_t *a)
     size_t page_idx = 0;
     unsigned page_elapsed_ms = 0;
     bool screen_on = true;
+    unsigned poll_mask = selected_poll_mask(a);
     char text[TEXT_MAX];
     uint8_t cols[COLS_MAX];
     uint8_t frame[FRAME_COLS];
@@ -106,15 +122,16 @@ static int run_sim(const app_args_t *a)
 
         page_id_t cur_page = a->pages[page_idx];
 
-        /* Lazy polling: poll ONLY when the current page actually needs the metric */
-        monitor_poll_page(&mon, cur_page);
+        /* Keep selected metrics fresh even when another page is displayed,
+         * so the discrete CPU and network indicators do not retain stale values. */
+        monitor_poll_masked(&mon, poll_mask);
 
         page_render(cur_page, &mon, text, sizeof(text));
         size_t ncols = font_render(text, cols, COLS_MAX);
 
         build_frame_centered(cols, ncols, frame);
 
-        uint8_t status = screen_on ? indicator_status(&mon) : 0;
+        uint8_t status = screen_on ? indicator_status(&mon, a) : 0;
         if (screen_on)
             sim_print_frame(frame, status);
         else
@@ -152,10 +169,12 @@ static int run_hw(const app_args_t *a)
 
     monitor_t mon;
     monitor_init(&mon, a->net_if);
+    monitor_set_net_smoothing_seconds(&mon, a->net_smoothing_secs);
 
     size_t page_idx = 0;
     unsigned page_elapsed_ms = 0;
     bool screen_on = true;
+    unsigned poll_mask = selected_poll_mask(a);
     char text[TEXT_MAX];
     uint8_t cols[COLS_MAX];
     uint8_t frame[FRAME_COLS];
@@ -207,15 +226,16 @@ static int run_hw(const app_args_t *a)
 
         page_id_t cur_page = a->pages[page_idx];
 
-        /* Lazy polling: poll ONLY when the current page needs the metric */
-        monitor_poll_page(&mon, cur_page);
+        /* Keep selected metrics fresh even when another page is displayed,
+         * so the discrete CPU and network indicators do not retain stale values. */
+        monitor_poll_masked(&mon, poll_mask);
 
         page_render(cur_page, &mon, text, sizeof(text));
         size_t ncols = font_render(text, cols, COLS_MAX);
 
         build_frame_centered(cols, ncols, frame);
 
-        if (!screen_write_frame(&screen, frame, indicator_status(&mon))) {
+        if (!screen_write_frame(&screen, frame, indicator_status(&mon, a))) {
             fprintf(stderr, "failed to write LED frame\n");
             screen_close(&screen);
             return 1;
@@ -259,20 +279,118 @@ int app_self_test(void)
         failures++;
     }
 
+    /* runtime settings and CLI parsing */
+    monitor_t settings_test;
+    monitor_init(&settings_test, "lo");
+    if (settings_test.net_smoothing_secs != 2.0) {
+        fprintf(stderr, "FAIL default net smoothing\n");
+        failures++;
+    }
+    monitor_set_net_smoothing_seconds(&settings_test, 0.0);
+    if (settings_test.net_smoothing_secs != 0.0) {
+        fprintf(stderr, "FAIL disable net smoothing\n");
+        failures++;
+    }
+    monitor_set_net_smoothing_seconds(&settings_test, -1.0);
+    if (settings_test.net_smoothing_secs != 0.0) {
+        fprintf(stderr, "FAIL clamp net smoothing\n");
+        failures++;
+    }
+
+    app_args_t args_test;
+    char *default_argv[] = { "athena-led-c", NULL };
+    if (app_parse_args(&args_test, 1, default_argv) != 0 ||
+        args_test.net_smoothing_secs != 2.0) {
+        fprintf(stderr, "FAIL default net smoothing arg\n");
+        failures++;
+    }
+    char *custom_argv[] = { "athena-led-c", "--net-smoothing-secs", "4.5", NULL };
+    if (app_parse_args(&args_test, 3, custom_argv) != 0 ||
+        args_test.net_smoothing_secs != 4.5) {
+        fprintf(stderr, "FAIL custom net smoothing arg\n");
+        failures++;
+    }
+    char *negative_argv[] = { "athena-led-c", "--net-smoothing-secs", "-1", NULL };
+    if (app_parse_args(&args_test, 3, negative_argv) != 0 ||
+        args_test.net_smoothing_secs != 0.0) {
+        fprintf(stderr, "FAIL negative net smoothing arg\n");
+        failures++;
+    }
+    if (app_parse_args(&args_test, 1, default_argv) != 0 ||
+        args_test.indicator_net_kbytes != 10.0) {
+        fprintf(stderr, "FAIL default net threshold arg\n");
+        failures++;
+    }
+    char *threshold_argv[] = { "athena-led-c", "--indicator-net-kbytes", "2.5", NULL };
+    if (app_parse_args(&args_test, 3, threshold_argv) != 0 ||
+        args_test.indicator_net_kbytes != 2.5) {
+        fprintf(stderr, "FAIL custom net threshold arg\n");
+        failures++;
+    }
+    char *negative_threshold_argv[] = { "athena-led-c", "--indicator-net-kbytes", "-1", NULL };
+    if (app_parse_args(&args_test, 3, negative_threshold_argv) != 0 ||
+        args_test.indicator_net_kbytes != 0.0) {
+        fprintf(stderr, "FAIL negative net threshold arg\n");
+        failures++;
+    }
+
     /* monitor formatting */
     monitor_t m = {0};
     m.cpu_percent = 12.4; m.mem_percent = 34.5;
     m.temp_cpu_mc = 45123; m.temp_nss_mc = 52123;
-    m.rx_bps = 1234567; m.tx_bps = 987654;
+    m.rx_bytes_per_sec = 1234567; m.tx_bytes_per_sec = 987654;
     char buf[64];
     monitor_format_cpu(&m, buf, sizeof(buf));
-    if (strcmp(buf, "C:12%") != 0) { fprintf(stderr, "FAIL cpu format: %s\n", buf); failures++; }
+    if (strcmp(buf, "C^;12%") != 0) { fprintf(stderr, "FAIL cpu format: %s\n", buf); failures++; }
     monitor_format_mem(&m, buf, sizeof(buf));
-    if (strcmp(buf, "M:35%") != 0) { fprintf(stderr, "FAIL mem format: %s\n", buf); failures++; }
+    if (strcmp(buf, "M^;35%") != 0) { fprintf(stderr, "FAIL mem format: %s\n", buf); failures++; }
     monitor_format_temp(&m, buf, sizeof(buf));
-    if (strcmp(buf, "T:45.52") != 0) { fprintf(stderr, "FAIL temp format: %s\n", buf); failures++; }
+    if (strcmp(buf, "T^45.52") != 0) { fprintf(stderr, "FAIL temp format: %s\n", buf); failures++; }
     monitor_format_net(&m, true, buf, sizeof(buf));
-    if (strcmp(buf, "D:1.2M") != 0) { fprintf(stderr, "FAIL net format: %s\n", buf); failures++; }
+    if (strcmp(buf, "D^;;1.2M") != 0) { fprintf(stderr, "FAIL net format: %s\n", buf); failures++; }
+    m.rx_bytes_per_sec = 999.0;
+    monitor_format_net(&m, true, buf, sizeof(buf));
+    if (strcmp(buf, "D^999.0B") != 0) { fprintf(stderr, "FAIL low-rate net format: %s\n", buf); failures++; }
+    m.rx_bytes_per_sec = 123456789.0;
+    monitor_format_net(&m, true, buf, sizeof(buf));
+    if (strcmp(buf, "D^123.5M") != 0) { fprintf(stderr, "FAIL high-rate net format: %s\n", buf); failures++; }
+    m.rx_bytes_per_sec = 999.949;
+    monitor_format_net(&m, true, buf, sizeof(buf));
+    if (strcmp(buf, "D^999.9B") != 0) { fprintf(stderr, "FAIL max B format: %s\n", buf); failures++; }
+    m.rx_bytes_per_sec = 999.95;
+    monitor_format_net(&m, true, buf, sizeof(buf));
+    if (strcmp(buf, "D^;;1.0K") != 0) { fprintf(stderr, "FAIL net unit rollover: %s\n", buf); failures++; }
+    m.rx_bytes_per_sec = 999.95e9;
+    monitor_format_net(&m, true, buf, sizeof(buf));
+    if (strcmp(buf, "D^;;1.0T") != 0) { fprintf(stderr, "FAIL net unit rollover to T: %s\n", buf); failures++; }
+    m.rx_bytes_per_sec = 12345.0;
+    monitor_format_net(&m, true, buf, sizeof(buf));
+    if (strcmp(buf, "D^;12.3K") != 0) { fprintf(stderr, "FAIL net one leading zero: %s\n", buf); failures++; }
+    m.cpu_percent = 5.4;
+    monitor_format_cpu(&m, buf, sizeof(buf));
+    if (strcmp(buf, "C^;;5%") != 0) { fprintf(stderr, "FAIL cpu leading zeros: %s\n", buf); failures++; }
+    m.temp_cpu_mc = 5123; m.temp_nss_mc = 5123;
+    monitor_format_temp(&m, buf, sizeof(buf));
+    if (strcmp(buf, "T^;5.;5") != 0) { fprintf(stderr, "FAIL temp leading zeros: %s\n", buf); failures++; }
+
+    /* Dynamic monitor pages must keep a fixed rendered width. */
+    const char *fixed_texts[] = {
+        "C^;12%", "M^;35%", "T^45.52",
+        "D^;;1.2M", "D^999.0B", "U^123.5M"
+    };
+    for (size_t i = 0; i < sizeof(fixed_texts) / sizeof(fixed_texts[0]); i++) {
+        n = font_render(fixed_texts[i], cols, sizeof(cols));
+        if (strcmp(fixed_texts[i], "C^;12%") == 0 && n != 21) {
+            fprintf(stderr, "FAIL cpu width: %s=%zu\n", fixed_texts[i], n);
+            failures++;
+        } else if (strncmp(fixed_texts[i], "D^", 2) == 0 ||
+                   strncmp(fixed_texts[i], "U^", 2) == 0) {
+            if (n != 27) {
+                fprintf(stderr, "FAIL net width: %s=%zu\n", fixed_texts[i], n);
+                failures++;
+            }
+        }
+    }
 
     /* time page must be exactly 27 columns (single screen) */
     n = font_render("12^34^56", cols, sizeof(cols));

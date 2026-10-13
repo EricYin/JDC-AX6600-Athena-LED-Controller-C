@@ -21,8 +21,8 @@ define Package/athena-led-c
 endef
 
 define Package/athena-led-c/description
-Pure C11 daemon driving the JDCloud AX6600 (RE-CS-02) front 27x5
-LED matrix via TM1628A over GPIO. Local-only features: clock/date,
+Daemon driving the JDCloud AX6600 (RE-CS-02) front 27x5 LED matrix
+via TM1628A over GPIO. Local-only features: clock/date,
 Chinese lunar calendar, sunrise/sunset, CPU/memory/temperature and
 per-interface throughput. Terminal simulator included (--sim).
 endef

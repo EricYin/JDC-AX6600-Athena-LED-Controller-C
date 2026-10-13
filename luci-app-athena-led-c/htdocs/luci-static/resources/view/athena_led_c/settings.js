@@ -1,5 +1,6 @@
 'use strict';
 'require view';
+'require uci';
 'require form';
 'require fs';
 'require ui';
@@ -7,7 +8,7 @@
 'require network';
 
 /*
- * Athena LED Controller (C) — LuCI JS Settings View
+ * Athena LED Controller — LuCI JS Settings View
  * For JDCloud AX6600 (RE-CS-02) Pure C LED Daemon
  * Single-screen static display, direct checkbox selection with live preview
  */
@@ -122,14 +123,14 @@ function drawLedFrame(canvas, cols) {
 
 // 8 个纯本地功能项（无日出日落）
 var PAGE_ITEMS = [
-	{ id: 'time',     label: _('Time'),        icon: '🕒', preview: '12:34:56' },
+	{ id: 'time',     label: _('Time'),        icon: '🕒', preview: '12^34^56' },
 	{ id: 'date',     label: _('Date'),        icon: '📅', preview: '10-13' },
 	{ id: 'lunar',    label: _('Lunar'),       icon: '🏮', preview: 'L:9.4' },
-	{ id: 'cpu',      label: _('CPU'),         icon: '💻', preview: 'C:12%' },
-	{ id: 'mem',      label: _('Memory'),      icon: '💾', preview: 'M:35%' },
-	{ id: 'temp',     label: _('Temperature'), icon: '🌡️', preview: 'T:45.52' },
-	{ id: 'net_down', label: _('Download'),    icon: '⬇️', preview: 'D:12.5M' },
-	{ id: 'net_up',   label: _('Upload'),      icon: '⬆️', preview: 'U:1.8M' }
+	{ id: 'cpu',      label: _('CPU'),         icon: '💻', preview: 'C^;12%' },
+	{ id: 'mem',      label: _('Memory'),      icon: '💾', preview: 'M^;35%' },
+	{ id: 'temp',     label: _('Temperature'), icon: '🌡️', preview: 'T^45.52' },
+	{ id: 'net_down', label: _('Download'),    icon: '⬇️', preview: 'D^;12.5M' },
+	{ id: 'net_up',   label: _('Upload'),      icon: '⬆️', preview: 'U^;;1.8M' }
 ];
 
 function buildButtonHelpBox() {
@@ -155,125 +156,191 @@ function buildButtonHelpBox() {
 return view.extend({
 	load: function() {
 		return Promise.all([
+			L.resolveDefault(uci.load('athena-led-c'), {}),
 			network.getDevices().catch(function() { return []; })
 		]);
 	},
 
 	render: function(data) {
-		var netDevices = data[0] || [];
+		var netDevices = data[1] || [];
 		var m, s, o;
 
-		m = new form.Map('athena-led-c', _('Athena LED Controller (C)'),
-			_('Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Single-screen static display, zero horizontal scrolling, lazy monitoring.'));
+		m = new form.Map('athena-led-c', _('Athena LED Controller'));
 
 		s = m.section(form.NamedSection, 'main', 'main', _('General Settings'));
 		s.addremove = false;
 
-		var previewCanvas = null;
-		function updatePreview(text) {
-			if (previewCanvas) {
-				var cols = textToColumns(text);
-				drawLedFrame(previewCanvas, cols);
+		// ============================================================
+		// 1. Preview and independent page selection
+		// ============================================================
+		// The preview is intentionally independent from checkbox changes:
+		// selecting/deselecting a page never moves the preview.
+		var previewPageId = null;
+
+		var previewSection = E('div', { 'class': 'cbi-section' }, [
+			E('h3', {}, _('Screen Preview & Display Features')),
+			E('div', { 'class': 'cbi-section-descr' }, [
+				E('p', { style: 'margin:4px 0' },
+					_('Click a feature button to preview it.'))
+			])
+		]);
+
+		var previewCanvas = E('canvas', {
+			width: 27 * 12 + 10 * 2,
+			height: 5 * 12 + 10 * 2,
+			style: 'background:#1a1a1a;border-radius:8px;display:block;margin:8px 0 12px 0'
+		});
+		var previewButtons = E('div', {
+			style: 'display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px 0'
+		});
+
+		function updatePreview(pageId) {
+			var item = PAGE_ITEMS.filter(function(candidate) { return candidate.id == pageId; })[0];
+			previewPageId = item ? item.id : PAGE_ITEMS[0].id;
+
+			var previewItem = PAGE_ITEMS.filter(function(candidate) { return candidate.id == previewPageId; })[0];
+			drawLedFrame(previewCanvas, textToColumns(previewItem.preview));
+
+			for (var i = 0; i < previewButtons.children.length; i++) {
+				var button = previewButtons.children[i];
+				button.style.background = (button.getAttribute('data-page-id') == previewPageId)
+					? '#ffb020' : '#f8f9fa';
+				button.style.color = (button.getAttribute('data-page-id') == previewPageId)
+					? '#231000' : '#202124';
+				button.style.borderColor = (button.getAttribute('data-page-id') == previewPageId)
+					? '#d99616' : '#ced4da';
 			}
 		}
 
-		// ============================================================
-		// 1. 点阵预览与功能勾选（集成在卡片旁，直接绑定 pages）
-		// ============================================================
-		o = s.option(form.Value, 'pages', _('Display Pages'));
-		o.rmempty = false;
-		o.forcewrite = true;
+		PAGE_ITEMS.forEach(function(item) {
+			var button = E('button', {
+				type: 'button',
+				'data-page-id': item.id,
+				'class': 'cbi-button cbi-button-neutral',
+				style: 'padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid #ced4da;border-radius:6px;background:#f8f9fa;color:#202124'
+			}, item.icon + ' ' + item.label);
 
-		o.renderWidget = function(section_id, option_index, cfgvalue) {
-			// 精确读取配置：如果未配置则默认全选，如果配置了则严格使用配置值
-			var selectedValues;
-			if (cfgvalue == null) {
-				selectedValues = ['time', 'date', 'lunar', 'cpu', 'mem', 'temp', 'net_down', 'net_up'];
-			} else if (Array.isArray(cfgvalue)) {
-				selectedValues = cfgvalue;
-			} else {
-				selectedValues = String(cfgvalue).split(/[\s,]+/);
-			}
-
-			var CELL = 12, PAD = 10;
-			var canvas = E('canvas', {
-				width: 27 * CELL + PAD * 2,
-				height: 5 * CELL + PAD * 2,
-				style: 'background:#1a1a1a;border-radius:8px;display:block;margin:6px 0 12px 0'
+			button.addEventListener('click', function(ev) {
+				ev.preventDefault();
+				updatePreview(item.id);
 			});
-			previewCanvas = canvas;
 
-			var initialText = '12:34:56';
-			if (selectedValues.length > 0) {
-				for (var k = 0; k < PAGE_ITEMS.length; k++) {
-					if (selectedValues.indexOf(PAGE_ITEMS[k].id) !== -1) {
-						initialText = PAGE_ITEMS[k].preview;
-						break;
-					}
-				}
-			}
-			drawLedFrame(canvas, textToColumns(initialText));
+			previewButtons.appendChild(button);
+		});
+
+		updatePreview(PAGE_ITEMS[0].id);
+
+		previewSection.appendChild(previewButtons);
+		previewSection.appendChild(previewCanvas);
+
+		var pagesOption = s.option(form.Value, 'pages', _('Display Pages'));
+		pagesOption.rmempty = false;
+		pagesOption.forcewrite = true;
+		pagesOption.description = _('Only checked features are saved to the rotation list.');
+
+		pagesOption.load = function(section_id) {
+			var value = this.map.data.get(this.map.config, section_id, this.option);
+			var configured = (value == null) ? [] : (Array.isArray(value) ? value : String(value).split(/[\s,]+/));
+			var valid = configured.filter(function(page) {
+				return PAGE_ITEMS.some(function(item) { return item.id == page; });
+			});
+
+			// A missing pages option means all pages are enabled (legacy
+			// behavior). Once configured, use exactly the configured list.
+			var selected = (value == null && configured.length == 0)
+				? PAGE_ITEMS.map(function(item) { return item.id; })
+				: valid.filter(function(page, index) { return configured.indexOf(page) == index; });
+
+			this.cfgvalue(section_id, selected);
+			return selected;
+		};
+
+		pagesOption.renderWidget = function(section_id, option_index, cfgvalue) {
+			// Keep a stable value object for this widget. LuCI re-renders the
+			// map during save, so formvalue() must not depend on DOM lookups.
+			var selectedValues = Array.isArray(cfgvalue) ? cfgvalue.slice() : [];
 
 			var cardsContainer = E('div', {
-				id: 'athena-led-pages-container',
 				style: 'display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;'
 			});
 
 			PAGE_ITEMS.forEach(function(item) {
-				var isChecked = selectedValues.indexOf(item.id) !== -1;
+				var row = E('div', {
+					style: 'display:inline-flex;align-items:center;padding:7px 12px;' +
+					       'background:#f8f9fa;border:1px solid #ced4da;border-radius:6px;user-select:none;'
+				});
 
 				var cb = E('input', {
 					type: 'checkbox',
 					'data-page-id': item.id,
-					checked: isChecked,
-					style: 'margin-right:8px;transform:scale(1.2);cursor:pointer;'
+					style: 'margin:0 8px 0 0;transform:scale(1.15);cursor:pointer;'
 				});
 
-				var card = E('label', {
-					style: 'display:inline-flex;align-items:center;padding:7px 14px;' +
-					       'background:#f8f9fa;border:1px solid #ced4da;border-radius:6px;' +
-					       'cursor:pointer;user-select:none;transition:all 0.15s ease;'
-				}, [
-					cb,
-					E('span', {
-						style: 'font-weight:500;font-size:13px;',
-						click: function() {
-							updatePreview(item.preview);
-						}
-					}, item.icon + ' ' + item.label + ' (' + item.preview + ')')
-				]);
+				// Set the DOM property, not the HTML attribute. E() calls
+				// setAttribute(), where checked="false" still means checked.
+				cb.checked = selectedValues.indexOf(item.id) !== -1;
 
-				cb.addEventListener('change', function() {
-					updatePreview(item.preview);
+				var label = E('span', { style: 'font-weight:500;font-size:13px;cursor:pointer;' },
+					item.icon + ' ' + item.label);
+
+				function syncSelection() {
+					var index = selectedValues.indexOf(item.id);
+					if (cb.checked && index == -1)
+						selectedValues.push(item.id);
+					else if (!cb.checked && index != -1)
+						selectedValues.splice(index, 1);
+
+					pagesOption.cfgvalue(section_id, selectedValues);
+				}
+
+				cb.addEventListener('click', function(ev) {
+					ev.stopPropagation();
+					syncSelection();
 				});
 
-				cardsContainer.appendChild(card);
+				label.addEventListener('click', function(ev) {
+					cb.checked = !cb.checked;
+					ev.preventDefault();
+					ev.stopPropagation();
+					syncSelection();
+				});
+
+				row.appendChild(cb);
+				row.appendChild(label);
+				cardsContainer.appendChild(row);
 			});
 
-			return E('div', {}, [
-				E('div', { style: 'margin-bottom:4px;font-size:12px;color:#6c757d' },
-					_('Simulates the 27×5 LED matrix in real-time. Check the boxes to select pages for rotation; click any label to preview its matrix.')),
-				canvas,
-				cardsContainer
-			]);
+			return E('div', {}, [ cardsContainer ]);
 		};
 
-		// 🌟 精准从容器提取所有勾选状态的复选框
-		o.formvalue = function(section_id) {
-			var container = document.getElementById('athena-led-pages-container') || document;
-			var checked = [];
-			var cbs = container.querySelectorAll('input[type="checkbox"][data-page-id]');
-			for (var i = 0; i < cbs.length; i++) {
-				if (cbs[i].checked)
-					checked.push(cbs[i].getAttribute('data-page-id'));
-			}
+		pagesOption.formvalue = function(section_id) {
+			var value = this.cfgvalue(section_id);
+			var checked = PAGE_ITEMS.filter(function(item) {
+				return Array.isArray(value) && value.indexOf(item.id) !== -1;
+			}).map(function(item) { return item.id; });
+
+			// The C daemon requires at least one page.
 			return checked.length > 0 ? checked : ['time'];
 		};
 
-		// 🌟 存入表单数据缓存
-		o.write = function(section_id, formvalue) {
+		pagesOption.write = function(section_id, formvalue) {
 			var values = Array.isArray(formvalue) ? formvalue : (formvalue ? [formvalue] : ['time']);
-			return this.map.data.set(this.map.config, section_id, 'pages', values);
+			values = PAGE_ITEMS.filter(function(item) {
+				return values.indexOf(item.id) !== -1;
+			}).map(function(item) { return item.id; });
+
+			if (values.length == 0)
+				values = ['time'];
+
+			this.cfgvalue(section_id, values);
+			return this.map.data.set(this.map.config, section_id, this.option, values);
+		};
+
+		// Initialize the preview from the first enabled page, but do not bind
+		// preview navigation to checkbox state changes.
+		pagesOption.onchange = function(ev, section_id, value) {
+			if (Array.isArray(value) && value.length > 0)
+				updatePreview(value[0]);
 		};
 
 		// ============================================================
@@ -301,7 +368,7 @@ return view.extend({
 		o.description = _('Seconds to stay on each page before switching. Set to 0 for manual button flipping only (no auto-rotation). Greater than 0 enables automatic flipping.');
 
 		o = s.option(form.Value, 'net_interface', _('Traffic Monitor Interface'));
-		o.default = 'br-lan';
+		o.default = 'wan';
 		o.description = _('Network interface to monitor throughput for download and upload pages.');
 		netDevices.forEach(function(dev) {
 			var name = dev.getName();
@@ -312,7 +379,22 @@ return view.extend({
 		o = s.option(form.Value, 'poll_ms', _('Sampling Interval (ms)'));
 		o.datatype = 'range(100,1000)';
 		o.default = '250';
-		o.description = _('Key scanning and sensor refresh interval in milliseconds (default 250ms).');
+		o.description = _('Sampling and display refresh interval in milliseconds (default 250ms).');
+
+		o = s.option(form.Value, 'indicator_cpu_percent', _('CPU Indicator Threshold (%)'));
+		o.datatype = 'ufloat';
+		o.default = '5';
+		o.description = _('Light the CPU indicator when total CPU usage exceeds this percentage.');
+
+		o = s.option(form.Value, 'indicator_net_kbytes', _('Network Indicator Threshold (KB/s)'));
+		o.datatype = 'ufloat';
+		o.default = '10';
+		o.description = _('Light the up/down indicators when the corresponding direction exceeds this rate in KB/s (1 KB = 1000 bytes).');
+
+		o = s.option(form.Value, 'net_smoothing_secs', _('Network Rate Smoothing (seconds)'));
+		o.datatype = 'and(ufloat,min(0),max(60))';
+		o.default = '2';
+		o.description = _('Exponential moving average time constant for network rates. Set to 0 to disable smoothing; larger values change more slowly.');
 
 		// ============================================================
 		// 3. 服务操作按钮
@@ -357,6 +439,7 @@ return view.extend({
 
 			return E('div', {}, [
 				statusBox,
+				previewSection,
 				mapEl,
 				buildButtonHelpBox()
 			]);

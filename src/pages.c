@@ -21,12 +21,11 @@ void page_render(page_id_t page, const monitor_t *mon, char *buf, size_t len)
     switch (page) {
     case PAGE_TIME: {
         /*
-         * Blinking compact colon '^', exactly 27 columns (single screen):
+         * Both compact colons stay lit. Exactly 27 columns (single screen):
          * 6 digits x3 + 2 compact colons x1 + 7 gaps = 27 cols.
          */
-        char colon = (tm.tm_sec % 2 == 0) ? '^' : ' ';
-        snprintf(buf, len, "%02d%c%02d^%02d",
-                 tm.tm_hour, colon, tm.tm_min, tm.tm_sec);
+        snprintf(buf, len, "%02d^%02d^%02d",
+                 tm.tm_hour, tm.tm_min, tm.tm_sec);
         break;
     }
     case PAGE_DATE:

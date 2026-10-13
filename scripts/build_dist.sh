@@ -64,7 +64,7 @@ Depends: libc
 Section: utils
 Architecture: aarch64_cortex-a53
 Maintainer: perlyz
-Description: Pure C11 daemon driving the JDCloud AX6600 (RE-CS-02) front 27x5 LED matrix via TM1628A over GPIO.
+Description: Daemon driving the JDCloud AX6600 (RE-CS-02) front 27x5 LED matrix via TM1628A over GPIO.
 CPKG
 
 cat << 'PST' > "${TMP_IPK}/control/postinst"
@@ -107,7 +107,7 @@ Depends: athena-led-c, luci-base
 Section: luci
 Architecture: all
 Maintainer: perlyz
-Description: LuCI Web UI for JDCloud AX6600 (Athena) LED screen pure C daemon.
+Description: LuCI Web UI for JDCloud AX6600 (Athena) LED screen controller.
 CPKG
 
 cat << 'PST' > "${TMP_IPK}/control/postinst"

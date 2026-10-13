@@ -11,7 +11,10 @@ load_uci() {
 	config_get brightness main brightness 5
 	config_get page_secs main page_secs 0
 	config_get poll_ms main poll_ms 250
-	config_get net_interface main net_interface br-lan
+	config_get indicator_cpu_percent main indicator_cpu_percent 5
+	config_get indicator_net_kbytes main indicator_net_kbytes 10
+	config_get net_smoothing_secs main net_smoothing_secs 2
+	config_get net_interface main net_interface wan
 
 	pages_list=""
 	append_page() {
@@ -34,6 +37,9 @@ start_service() {
 		--brightness "$brightness" \
 		--page-secs "$page_secs" \
 		--poll-ms "$poll_ms" \
+		--indicator-cpu-percent "$indicator_cpu_percent" \
+		--indicator-net-kbytes "$indicator_net_kbytes" \
+		--net-smoothing-secs "$net_smoothing_secs" \
 		--net-interface "$net_interface" \
 		--pages "$pages_list"
 	procd_set_param pidfile /var/run/athena-led-c.pid

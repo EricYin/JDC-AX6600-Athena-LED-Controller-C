@@ -15,15 +15,29 @@ typedef struct {
     /* Temperature (millidegrees C, -1 = unavailable) */
     int temp_cpu_mc;
     int temp_nss_mc;
-    /* Network counters for the configured interface */
+    /* Network counters for the configured interface.
+     * rx/tx_bytes_per_sec are EMA-smoothed byte/s rates. */
     uint64_t rx_bytes, tx_bytes;
-    double rx_bps, tx_bps;
+    double rx_bytes_per_sec, tx_bytes_per_sec;
+    double net_smoothing_secs;
+    bool net_rates_valid;
 } monitor_t;
 
 void monitor_init(monitor_t *m, const char *ifname);
+void monitor_set_net_smoothing_seconds(monitor_t *m, double seconds);
 
-/* Lazy polling: poll ONLY the metric required by the current active page.
- * If page is TIME, DATE, LUNAR, or SUN, performs ZERO file I/O or syscalls. */
+/* Poll only the metrics selected by `poll_mask`. Used by the runtime loop
+ * so background indicator sampling exactly follows the configured pages. */
+#define MONITOR_POLL_CPU  (1u << 0)
+#define MONITOR_POLL_MEM  (1u << 1)
+#define MONITOR_POLL_TEMP (1u << 2)
+#define MONITOR_POLL_NET  (1u << 3)
+#define MONITOR_POLL_ALL  0x0fu
+
+unsigned monitor_poll_mask_page(int page);
+void monitor_poll_masked(monitor_t *m, unsigned poll_mask);
+
+/* Compatibility helper: poll the metric required by one page. */
 void monitor_poll_page(monitor_t *m, int page);
 
 /* Full poll (used for tests/diagnostics only) */

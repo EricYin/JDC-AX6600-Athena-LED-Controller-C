@@ -1,14 +1,11 @@
 msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8\n"
 
-msgid "Athena LED (C)"
-msgstr "雅典娜 LED (C版)"
+msgid "Athena LED"
+msgstr "雅典娜 LED"
 
-msgid "Athena LED Controller (C)"
-msgstr "京东云雅典娜 LED 点阵屏控制器 (纯 C 版)"
-
-msgid "Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Single-screen static display, zero horizontal scrolling, lazy monitoring."
-msgstr "专为京东云雅典娜 AX6600 (RE-CS-02) 打造的纯 C11 LED 控制守护进程。单屏静态显示，彻底去除横向翻滚，按需惰性监控采样。"
+msgid "Athena LED Controller"
+msgstr "京东云雅典娜 LED 点阵屏控制器"
 
 msgid "Running Status"
 msgstr "运行状态"
@@ -31,8 +28,14 @@ msgstr "服务操作「%s」执行成功。"
 msgid "Screen Preview & Display Features"
 msgstr "屏幕点阵预览与显示功能勾选"
 
+msgid "Click a feature button to preview it."
+msgstr "点击功能按钮即可预览。"
+
 msgid "Display Pages"
 msgstr "显示页面选择"
+
+msgid "Only checked features are saved to the rotation list."
+msgstr "仅勾选的功能会保存到轮播列表。"
 
 msgid "Time"
 msgstr "时钟"
@@ -116,16 +119,22 @@ msgid "Traffic Monitor Interface"
 msgstr "流量监控网卡接口"
 
 msgid "Network interface to monitor throughput for download and upload pages."
-msgstr "上下行网速监控所统计的网卡接口（例如 br-lan 或 wan）。"
+msgstr "上下行网速监控所统计的网卡接口（例如 wan 或 br-lan）。"
 
 msgid "Advanced Tuning"
 msgstr "高级调优"
 
 msgid "Sampling Interval (ms)"
-msgstr "采样与按键扫描周期 (毫秒)"
+msgstr "采样与刷新周期 (毫秒)"
 
-msgid "Key scanning and sensor refresh interval in milliseconds (default 250ms)."
-msgstr "按键与当前活动页面的数据刷新周期（默认 250ms，idle 状态下由 poll 挂起不占 CPU）。"
+msgid "Sampling and display refresh interval in milliseconds (default 250ms)."
+msgstr "监控数据采样与屏幕刷新周期（默认 250ms）。"
+
+msgid "Network Rate Smoothing (seconds)"
+msgstr "网络速率平滑时间（秒）"
+
+msgid "Exponential moving average time constant for network rates. Set to 0 to disable smoothing; larger values change more slowly."
+msgstr "网络速率的指数移动平均时间常数。设为 0 表示关闭平滑；数值越大变化越慢。"
 
 msgid "Service Control"
 msgstr "服务操作"
@@ -147,3 +156,15 @@ msgstr "启动服务"
 
 msgid "Start"
 msgstr "启动"
+
+msgid "CPU Indicator Threshold (%)"
+msgstr "CPU 指示灯阈值 (%)"
+
+msgid "Light the CPU indicator when total CPU usage exceeds this percentage."
+msgstr "当整体 CPU 使用率超过该百分比时点亮 CPU 指示灯。"
+
+msgid "Network Indicator Threshold (KB/s)"
+msgstr "网络指示灯阈值 (KB/s)"
+
+msgid "Light the up/down indicators when the corresponding direction exceeds this rate in KB/s (1 KB = 1000 bytes)."
+msgstr "当上传或下载速率超过该 KB/s 阈值时点亮对应方向指示灯（1 KB = 1000 字节）。"

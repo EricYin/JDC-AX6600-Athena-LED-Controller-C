@@ -19,8 +19,11 @@ static void usage(FILE *out)
 "  --page NAME               add a single page to the display rotation\n"
 "  --page-secs N             seconds per page (0 = manual button switch only)\n"
 "  --poll-ms N               sampling interval in ms (default 250)\n"
+"  --indicator-cpu-percent N CPU indicator threshold in percent (default 5)\n"
+"  --indicator-net-kbytes N  network indicator threshold in KB/s (default 10)\n"
+"  --net-smoothing-secs N    network rate EMA time constant; 0 disables (default 2)\n"
 "  --brightness 0..7         panel brightness (default 5)\n"
-"  --net-interface NAME      interface for throughput (default br-lan)\n"
+"  --net-interface NAME      interface for throughput (default wan)\n"
 "  --self-test               run built-in tests and exit\n"
 "  -h, --help                show this help\n",
     out);
@@ -49,8 +52,11 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
     memset(a, 0, sizeof(*a));
     a->page_secs = 0; /* default 0: manual flip only unless configured */
     a->poll_ms = 250;
+    a->indicator_cpu_percent = 5.0;
+    a->indicator_net_kbytes = 10.0;
+    a->net_smoothing_secs = 2.0;
     a->brightness = 5;
-    a->net_if = "br-lan";
+    a->net_if = "wan";
     a->num_pages = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -72,6 +78,12 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
             a->page_secs = (unsigned)strtoul(argv[++i], NULL, 10);
         } else if (strcmp(arg, "--poll-ms") == 0 && i + 1 < argc) {
             a->poll_ms = (unsigned)strtoul(argv[++i], NULL, 10);
+        } else if (strcmp(arg, "--indicator-cpu-percent") == 0 && i + 1 < argc) {
+            a->indicator_cpu_percent = strtod(argv[++i], NULL);
+        } else if (strcmp(arg, "--indicator-net-kbytes") == 0 && i + 1 < argc) {
+            a->indicator_net_kbytes = strtod(argv[++i], NULL);
+        } else if (strcmp(arg, "--net-smoothing-secs") == 0 && i + 1 < argc) {
+            a->net_smoothing_secs = strtod(argv[++i], NULL);
         } else if (strcmp(arg, "--brightness") == 0 && i + 1 < argc) {
             a->brightness = (uint8_t)(strtoul(argv[++i], NULL, 10) & 0x07);
         } else if (strcmp(arg, "--net-interface") == 0 && i + 1 < argc) {
@@ -88,6 +100,9 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
         a->num_pages = 1;
     }
     if (a->poll_ms == 0) a->poll_ms = 250;
+    if (a->indicator_cpu_percent < 0.0) a->indicator_cpu_percent = 0.0;
+    if (a->indicator_net_kbytes < 0.0) a->indicator_net_kbytes = 0.0;
+    if (a->net_smoothing_secs < 0.0) a->net_smoothing_secs = 0.0;
     return 0;
 }
 
