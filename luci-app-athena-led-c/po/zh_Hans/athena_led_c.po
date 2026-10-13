@@ -1,0 +1,194 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Athena LED (C)"
+msgstr "雅典娜 LED (C版)"
+
+msgid "Athena LED Controller (C)"
+msgstr "京东云雅典娜 LED 点阵屏控制器 (纯 C 版)"
+
+msgid "Pure C11 LED daemon for JDCloud AX6600 (RE-CS-02). Ultra-low resource usage, hardware TM1628A driver with local monitor pages."
+msgstr "专为京东云雅典娜 AX6600 (RE-CS-02) 打造的纯 C11 LED 控制守护进程。超低系统资源开销，原生 TM1628A 硬件驱动与全本地监控轮播。"
+
+msgid "Running Status"
+msgstr "运行状态"
+
+msgid "Collecting data..."
+msgstr "正在获取状态..."
+
+msgid "RUNNING"
+msgstr "运行中"
+
+msgid "NOT RUNNING"
+msgstr "未运行"
+
+msgid "Command failed with code %d"
+msgstr "命令执行失败，返回码 %d"
+
+msgid "Service action \"%s\" executed successfully."
+msgstr "服务操作「%s」执行成功。"
+
+msgid "Screen Preview"
+msgstr "屏幕实时点阵预览"
+
+msgid "Simulates the 27×5 LED matrix display in real-time. Supports digits, A-Z letters and symbols with amber glow effect."
+msgstr "实时模拟真实 27×5 LED 点阵屏硬件显示效果。支持数字、英文字母及符号，还原琥珀色发光与微光晕效果。"
+
+msgid "Type text to preview..."
+msgstr "输入任意文本以实时预览..."
+
+msgid "Click preset buttons below or type custom text"
+msgstr "点击下方快捷按钮或在上框输入自定义内容"
+
+msgid "Time"
+msgstr "时钟"
+
+msgid "Date"
+msgstr "日期"
+
+msgid "Lunar"
+msgstr "农历"
+
+msgid "Sunrise/Sunset"
+msgstr "日出日落"
+
+msgid "CPU"
+msgstr "CPU"
+
+msgid "Memory"
+msgstr "内存"
+
+msgid "Temperature"
+msgstr "温度"
+
+msgid "Download"
+msgstr "下行网速"
+
+msgid "Upload"
+msgstr "上行网速"
+
+msgid "Physical Button Gestures"
+msgstr "机身物理按键手势说明"
+
+msgid "Single Click: "
+msgstr "单击屏幕按键："
+
+msgid "Switch to next monitoring page immediately."
+msgstr "立即切换至下一项监控页面。"
+
+msgid "Double Click: "
+msgstr "双击屏幕按键："
+
+msgid "Jump directly back to the primary Time page."
+msgstr "立即返回首页面（时钟）。"
+
+msgid "Long Press (1.5s): "
+msgstr "长按屏幕按键 (1.5秒)："
+
+msgid "Toggle screen standby power (turn display ON or OFF)."
+msgstr "切换屏幕待机供电（点亮或熄灭点阵屏）。"
+
+msgid "General Settings"
+msgstr "基本设置"
+
+msgid "Enabled"
+msgstr "启用服务"
+
+msgid "Enable or disable the Athena LED screen service."
+msgstr "开启或禁用雅典娜 LED 屏幕后台守护进程。"
+
+msgid "Brightness Level"
+msgstr "屏幕亮度级别"
+
+msgid "Panel brightness level (0 to 7)."
+msgstr "点阵屏硬件亮度级别（0 到 7）。"
+
+msgid " (Dimmest)"
+msgstr " (最暗)"
+
+msgid " (Default)"
+msgstr " (默认)"
+
+msgid " (Brightest)"
+msgstr " (最亮)"
+
+msgid "Page Display Time (seconds)"
+msgstr "页面轮播停留时间 (秒)"
+
+msgid "Duration each monitor page stays on screen before advancing to the next page."
+msgstr "每个监控页面在屏幕上保持显示的时间（秒），到期后自动平滑轮播到下一项。"
+
+msgid "Traffic Monitor Interface"
+msgstr "流量监控网卡接口"
+
+msgid "Network interface to monitor throughput for download and upload pages."
+msgstr "上下行网速监控所统计的网卡接口（例如 br-lan 或 wan）。"
+
+msgid "Coordinates for Sunrise/Sunset"
+msgstr "日出日落经纬度坐标"
+
+msgid "Latitude and longitude (\"lat,lon\") used by the local solar algorithm to calculate sunrise and sunset times."
+msgstr "用于本地太阳算法计算日出日落时间的经纬度坐标（格式：\"纬度,经度\"，无需联网）。"
+
+msgid "Beijing (39.90, 116.40)"
+msgstr "北京 (39.90, 116.40)"
+
+msgid "Shanghai (31.23, 121.47)"
+msgstr "上海 (31.23, 121.47)"
+
+msgid "Guangzhou (23.13, 113.26)"
+msgstr "广州 (23.13, 113.26)"
+
+msgid "Shenzhen (22.54, 114.05)"
+msgstr "深圳 (22.54, 114.05)"
+
+msgid "Chengdu (30.67, 104.06)"
+msgstr "成都 (30.67, 104.06)"
+
+msgid "Wuhan (30.59, 114.31)"
+msgstr "武汉 (30.59, 114.31)"
+
+msgid "Nanjing (32.06, 118.80)"
+msgstr "南京 (32.06, 118.80)"
+
+msgid "Hangzhou (30.27, 120.15)"
+msgstr "杭州 (30.27, 120.15)"
+
+msgid "Xi'an (34.26, 108.94)"
+msgstr "西安 (34.26, 108.94)"
+
+msgid "Advanced Tuning"
+msgstr "高级调优"
+
+msgid "Scroll Interval (ms)"
+msgstr "文字滚动步进间隔 (毫秒)"
+
+msgid "Frame step interval in milliseconds for scrolling text that exceeds 27 columns (default 128ms)."
+msgstr "当显示文本超过 27 列屏幕宽度时，平滑滚动的单步刷新毫秒数（默认 128ms）。"
+
+msgid "Sampling Interval (ms)"
+msgstr "硬件与数据采样间隔 (毫秒)"
+
+msgid "System sensor sampling and button polling interval in milliseconds (default 250ms)."
+msgstr "CPU/内存/温度采集及按键边缘检测的轮询间隔（默认 250ms，idle 状态下由 poll 挂起不占 CPU）。"
+
+msgid "Service Control"
+msgstr "服务操作"
+
+msgid "Restart Service"
+msgstr "重启服务"
+
+msgid "Restart"
+msgstr "重启"
+
+msgid "Stop Service"
+msgstr "停止服务"
+
+msgid "Stop"
+msgstr "停止"
+
+msgid "Start Service"
+msgstr "启动服务"
+
+msgid "Start"
+msgstr "启动"

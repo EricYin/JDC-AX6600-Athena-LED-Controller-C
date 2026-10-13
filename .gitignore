@@ -3,3 +3,4 @@ build/
 athena-led-c
 *.d
 core
+dist/
