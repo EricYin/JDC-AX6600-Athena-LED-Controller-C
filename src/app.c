@@ -21,17 +21,13 @@
 #define FRAME_COLS 27
 
 static volatile sig_atomic_t g_running = 1;
-static volatile sig_atomic_t g_btn_short = 0;
-static volatile sig_atomic_t g_btn_toggle = 0;
 
 static void on_signal(int sig)
 {
     if (sig == SIGINT || sig == SIGTERM) {
         g_running = 0;
-    } else if (sig == SIGUSR1) {
-        g_btn_short = 1;
-    } else if (sig == SIGUSR2) {
-        g_btn_toggle = 1;
+    } else if (sig == SIGUSR1 || sig == SIGUSR2) {
+        button_notify_signal(sig);
     }
 }
 
@@ -59,9 +55,8 @@ static void sleep_ms(unsigned ms)
         .tv_sec = ms / 1000,
         .tv_nsec = (long)(ms % 1000) * 1000000L,
     };
-    while (nanosleep(&ts, &ts) == -1 && errno == EINTR) {
-        /* retry remaining time; never busy-wait */
-    }
+    /* Interrupted immediately when SIGUSR1 or SIGUSR2 arrives */
+    nanosleep(&ts, NULL);
 }
 
 static void build_frame_centered(const uint8_t *cols, size_t n, uint8_t out[FRAME_COLS])
@@ -143,6 +138,7 @@ static int run_sim(const app_args_t *a)
 static int run_hw(const app_args_t *a)
 {
     install_signal_handlers();
+    button_init_signals();
 
     screen_t screen;
     if (!screen_init(&screen, GPIO_BACKEND_AUTO, 0)) {
@@ -154,11 +150,6 @@ static int run_hw(const app_args_t *a)
         screen_close(&screen);
         return 1;
     }
-
-    button_t button;
-    bool button_ok = button_init(&button, BUTTON_GPIO_PIN);
-    if (!button_ok)
-        fprintf(stderr, "warning: screen button unavailable\n");
 
     monitor_t mon;
     monitor_init(&mon, a->net_if);
@@ -174,22 +165,12 @@ static int run_hw(const app_args_t *a)
 
     while (g_running) {
         /*
-         * button_poll() blocks for poll_ms with zero CPU when idle,
-         * waking immediately on a key edge so page switches feel instant.
+         * Sleep for poll_ms (nanosleep). If SIGUSR1 or SIGUSR2 arrives from procd,
+         * nanosleep is interrupted immediately for zero-latency response!
          */
-        button_action_t act = BUTTON_NONE;
-        if (button_ok)
-            act = button_poll(&button, (int)a->poll_ms);
-        else
-            sleep_ms(a->poll_ms);
+        sleep_ms(a->poll_ms < 50 ? 50 : a->poll_ms);
 
-        if (g_btn_short) {
-            g_btn_short = 0;
-            act = BUTTON_SHORT;
-        } else if (g_btn_toggle) {
-            g_btn_toggle = 0;
-            act = BUTTON_LONG;
-        }
+        button_action_t act = button_get_action();
 
         long long now = monotonic_ms();
         unsigned elapsed = (unsigned)(now - last_tick);
@@ -227,16 +208,12 @@ static int run_hw(const app_args_t *a)
 
         page_id_t cur_page = a->pages[page_idx];
 
-        /*
-         * Lazy polling: poll ONLY when the current page needs the metric.
-         * If cur_page is TIME, DATE, LUNAR, or SUN, performs ZERO file reads!
-         */
+        /* Lazy polling: poll ONLY when the current page needs the metric */
         monitor_poll_page(&mon, cur_page);
 
         page_render(cur_page, &mon, a->sun_coords, text, sizeof(text));
         size_t ncols = font_render(text, cols, COLS_MAX);
 
-        /* Single screen, zero horizontal scrolling */
         build_frame_centered(cols, ncols, frame);
 
         if (!screen_write_frame(&screen, frame, indicator_status(&mon))) {
@@ -254,7 +231,6 @@ static int run_hw(const app_args_t *a)
 
     /* graceful shutdown */
     screen_power(&screen, false, 0);
-    if (button_ok) button_close(&button);
     screen_close(&screen);
     return 0;
 }
