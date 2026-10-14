@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-JDCloud%20AX6600%20(RE--CS--02)-brightgreen.svg)](#)
 [![Language](https://img.shields.io/badge/language-C11-orange.svg)](#)
-[![Release](https://img.shields.io/badge/release-v0.3.0-blue.svg)](https://github.com/perlyz/JDC-AX6600-Athena-LED-Controller-C/releases)
+[![Release](https://img.shields.io/badge/release-v0.4.0-blue.svg)](https://github.com/perlyz/JDC-AX6600-Athena-LED-Controller-C/releases)
 
 京东云雅典娜路由器（JDCloud AX6600 / RE-CS-02）前置 27×5 LED 点阵屏控制程序与配套 LuCI Web 管理界面。
 
@@ -22,7 +22,9 @@
 - **高性能与低资源开销**：纯 C11 实现，二进制体积约 30KB，常驻运行内存 < 1MB，CPU 占用日常接近 0%。
 - **硬件驱动与物理按键支持**：
   - 基于 TM1628A 芯片实现 GPIO 驱动，支持 cdev 与 sysfs 双后端自动探测。
-  - 完整接入机身侧边 `screen` 实体按键：单击切页、双击返回首页、长按待机息屏/唤醒，通过内核信号实现即时唤醒。
+  - 完整接入机身侧边 `screen` 实体按键：单击切页、双击返回首页、长按待机息屏/唤醒（长按 2 秒由 procd 超时即刻响应，状态持久化保存）。
+  - 支持屏幕待机供电持久化与 Web 管理界面一键即时开关（立即熄屏 / 立即点亮），毫秒级生效且重启路由器依然保持。
+  - 支持自定义单行文本显示（`text`），Web 界面输入实时限制在 27 列点阵以内并提供 Canvas 点阵仿真预览。
 - **本地系统监控与网速平滑**：
   - 纯本地读取 `/proc` 与 `/sys` 状态（CPU、内存、温度、网络流量），无任何网络请求。
   - 支持网络速率指数移动平均（EMA）平滑滤波，采用固定位宽排版，避免数值刷新时界面抖动。
@@ -108,6 +110,7 @@ Options:
   --sim, --test             运行终端字符模拟器 (27x5, ■/·)
   --no-clear                模拟器模式下不逐帧清屏
   --screen-on 0|1           初始屏幕电源状态 (1 = 点亮, 0 = 息屏待机; 默认: 1)
+  --custom-text TEXT        自定义文本页面的文本内容 (最多 27 列点阵, 默认: ATHENA)
   --pages LIST              轮播页面列表 (默认: time,net_down,net_up,mem,cpu,temp,date,lunar)
   --page NAME               追加单个页面到轮播列表
   --page-secs N             每页自动停留秒数 (0 = 仅依靠物理按键手动翻屏)

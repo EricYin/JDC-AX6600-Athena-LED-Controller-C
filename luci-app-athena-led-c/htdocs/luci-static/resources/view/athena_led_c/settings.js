@@ -7,8 +7,8 @@
 'require poll';
 'require network';
 
-var LUCI_APP_VERSION = '0.3.0';
-var CORE_VERSION = '0.3.0';
+var LUCI_APP_VERSION = '0.4.0';
+var CORE_VERSION = '0.4.0';
 
 /*
  * Athena LED Controller — LuCI JS Settings View

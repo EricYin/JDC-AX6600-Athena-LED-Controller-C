@@ -35,8 +35,8 @@ cp -f "${DIST_DIR}/i18n/athena_led_c.zh-cn.lmo" "${DIST_DIR}/i18n/athena_led_c.z
 
 echo "=== 4. 拷贝 ImmortalWrt 编译出的 APK 安装包 ==="
 mkdir -p "${DIST_DIR}/apk"
-cp -f "${IM_DIR}/bin/packages/aarch64_cortex-a53/base/athena-led-c-0.3.0"*.apk "${DIST_DIR}/apk/" 2>/dev/null || true
-cp -f "${IM_DIR}/bin/packages/aarch64_cortex-a53/base/luci-app-athena-led-c-0.3.0"*.apk "${DIST_DIR}/apk/" 2>/dev/null || true
+cp -f "${IM_DIR}/bin/packages/aarch64_cortex-a53/base/athena-led-c-0.4.0"*.apk "${DIST_DIR}/apk/" 2>/dev/null || true
+cp -f "${IM_DIR}/bin/packages/aarch64_cortex-a53/base/luci-app-athena-led-c-0.4.0"*.apk "${DIST_DIR}/apk/" 2>/dev/null || true
 
 echo "=== 5. 构建通用 IPK 安装包 ==="
 mkdir -p "${DIST_DIR}/ipk"
@@ -59,7 +59,7 @@ ln -sf screen "${TMP_IPK}/data/etc/rc.button/btn_1"
 
 cat << 'CPKG' > "${TMP_IPK}/control/control"
 Package: athena-led-c
-Version: 0.3.0
+Version: 0.4.0
 Depends: libc
 Section: utils
 Architecture: aarch64_cortex-a53
@@ -79,7 +79,7 @@ chmod 755 "${TMP_IPK}/control/postinst"
 echo "2.0" > "${TMP_IPK}/debian-binary"
 tar -C "${TMP_IPK}/control" -czf "${TMP_IPK}/control.tar.gz" .
 tar -C "${TMP_IPK}/data" -czf "${TMP_IPK}/data.tar.gz" .
-tar -C "${TMP_IPK}" -czf "${DIST_DIR}/ipk/athena-led-c_0.3.0_aarch64_cortex-a53.ipk" debian-binary control.tar.gz data.tar.gz
+tar -C "${TMP_IPK}" -czf "${DIST_DIR}/ipk/athena-led-c_0.4.0_aarch64_cortex-a53.ipk" debian-binary control.tar.gz data.tar.gz
 rm -rf "${TMP_IPK}"
 
 # 5.2 构建 luci-app-athena-led-c.ipk
@@ -102,7 +102,7 @@ cp -f "${DIST_DIR}/i18n/athena_led_c.zh_Hans.lmo" "${TMP_IPK}/data/usr/lib/lua/l
 
 cat << 'CPKG' > "${TMP_IPK}/control/control"
 Package: luci-app-athena-led-c
-Version: 0.3.0
+Version: 0.4.0
 Depends: athena-led-c, luci-base
 Section: luci
 Architecture: all
@@ -123,7 +123,7 @@ chmod 755 "${TMP_IPK}/control/postinst"
 echo "2.0" > "${TMP_IPK}/debian-binary"
 tar -C "${TMP_IPK}/control" -czf "${TMP_IPK}/control.tar.gz" .
 tar -C "${TMP_IPK}/data" -czf "${TMP_IPK}/data.tar.gz" .
-tar -C "${TMP_IPK}" -czf "${DIST_DIR}/ipk/luci-app-athena-led-c_0.3.0_all.ipk" debian-binary control.tar.gz data.tar.gz
+tar -C "${TMP_IPK}" -czf "${DIST_DIR}/ipk/luci-app-athena-led-c_0.4.0_all.ipk" debian-binary control.tar.gz data.tar.gz
 rm -rf "${TMP_IPK}"
 
 echo "=== 6. 构建直接解压全量包 (athena-led-c-bundle.tar.gz) ==="
