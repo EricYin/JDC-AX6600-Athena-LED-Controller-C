@@ -15,8 +15,9 @@ static void usage(FILE *out)
 "  --sim, --test             run terminal simulator (27x5, ■/·)\n"
 "  --no-clear                simulator: do not clear terminal each frame\n"
 "  --screen-on 0|1           initial screen power state (default 1: ON)\n"
+"  --custom-text TEXT        custom text for text page (max 27 cols, default ATHENA)\n"
 "  --pages LIST              comma/space separated pages to display:\n"
-"                            time,net_down,net_up,mem,cpu,temp,date,lunar\n"
+"                            time,net_down,net_up,mem,cpu,temp,date,lunar,text\n"
 "  --page NAME               add a single page to the display rotation\n"
 "  --page-secs N             seconds per page (0 = manual button switch only)\n"
 "  --poll-ms N               sampling interval in ms (default 250)\n"
@@ -55,6 +56,7 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
     a->page_secs = 0; /* default 0: manual flip only unless configured */
     a->poll_ms = 250;
     a->screen_on = true;
+    a->custom_text = "ATHENA";
     a->indicator_cpu_percent = 5.0;
     a->indicator_net_kbytes = 10.0;
     a->net_smoothing_secs = 2.0;
@@ -94,6 +96,8 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
             a->screen_on = (atoi(argv[++i]) != 0);
         } else if (strcmp(arg, "--brightness") == 0 && i + 1 < argc) {
             a->brightness = (uint8_t)(strtoul(argv[++i], NULL, 10) & 0x07);
+        } else if (strcmp(arg, "--custom-text") == 0 && i + 1 < argc) {
+            a->custom_text = argv[++i];
         } else if (strcmp(arg, "--net-interface") == 0 && i + 1 < argc) {
             a->net_if = argv[++i];
         } else {
@@ -120,6 +124,8 @@ int main(int argc, char **argv)
     int rc = app_parse_args(&args, argc, argv);
     if (rc != 0)
         return rc < 0 ? 2 : 0;
+
+    pages_set_custom_text(args.custom_text);
 
     if (args.self_test)
         return app_self_test();

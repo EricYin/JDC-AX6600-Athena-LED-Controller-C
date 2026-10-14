@@ -429,7 +429,9 @@ int app_self_test(void)
     /* page_from_name tests */
     if (page_from_name("time") != PAGE_TIME ||
         page_from_name("temp") != PAGE_TEMP ||
-        page_from_name("net_down") != PAGE_NET_DOWN) {
+        page_from_name("net_down") != PAGE_NET_DOWN ||
+        page_from_name("text") != PAGE_TEXT ||
+        page_from_name("custom") != PAGE_TEXT) {
         fprintf(stderr, "FAIL page_from_name\n");
         failures++;
     }

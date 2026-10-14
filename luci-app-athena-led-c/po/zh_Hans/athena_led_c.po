@@ -198,3 +198,21 @@ msgstr "立即亮屏"
 
 msgid "(Instant & persistent across reboots)"
 msgstr "(即时生效并持久化保存，重启路由器依然有效)"
+
+msgid "Custom Text"
+msgstr "自定义文本"
+
+msgid "Custom Text Content"
+msgstr "自定义文本内容"
+
+msgid "Text displayed on the custom text page. Automatically restricted to 27 LED dot matrix columns."
+msgstr "在自定义文本页面显示的文字内容。输入时自动限制在 27 列点阵以内。"
+
+msgid "Custom text cannot be empty."
+msgstr "自定义文本内容不能为空。"
+
+msgid "Text exceeds 27 LED columns (currently %d columns)."
+msgstr "文本超出 27 列点阵宽度（当前已占 %d 列）。"
+
+msgid "Dot Matrix Width: %d/27 columns"
+msgstr "点阵宽度: %d/27 列"

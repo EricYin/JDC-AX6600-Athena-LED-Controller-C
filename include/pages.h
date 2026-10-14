@@ -16,6 +16,7 @@ typedef enum {
     PAGE_TEMP,
     PAGE_DATE,
     PAGE_LUNAR,
+    PAGE_TEXT,
     PAGE_COUNT
 } page_id_t;
 
@@ -26,3 +27,6 @@ const char *page_name(page_id_t page);
 page_id_t page_from_name(const char *name);
 
 #endif
+
+void pages_set_custom_text(const char *text);
+const char *pages_get_custom_text(void);

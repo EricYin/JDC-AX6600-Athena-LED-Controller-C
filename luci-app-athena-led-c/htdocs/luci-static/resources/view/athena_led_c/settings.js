@@ -145,8 +145,9 @@ var PAGE_ITEMS = [
 	{ id: 'mem',      label: _('Memory'),      icon: '💾', preview: 'M^;35%' },
 	{ id: 'cpu',      label: _('CPU'),         icon: '💻', preview: 'C^;12%' },
 	{ id: 'temp',     label: _('Temperature'), icon: '🌡️', preview: 'T^45.52' },
-	{ id: 'date',     label: _('Date'),        icon: '📅', preview: '10-13' },
-	{ id: 'lunar',    label: _('Lunar'),       icon: '🏮', preview: 'L:9.4' }
+	{ id: 'date',     label: _('Date'),        icon: '📅', preview: '10-14' },
+	{ id: 'lunar',    label: _('Lunar'),       icon: '🏮', preview: 'L:9.4' },
+	{ id: 'text',     label: _('Custom Text'), icon: '💬', preview: 'ATHENA' }
 ];
 
 function buildButtonHelpBox() {
@@ -180,6 +181,7 @@ return view.extend({
 	render: function(data) {
 		var netDevices = data[1] || [];
 		var m, s, o;
+		var currentCustomText = 'ATHENA';
 
 		m = new form.Map('athena-led-c', _('Athena LED Controller'));
 
@@ -215,7 +217,10 @@ return view.extend({
 			previewPageId = item ? item.id : PAGE_ITEMS[0].id;
 
 			var previewItem = PAGE_ITEMS.filter(function(candidate) { return candidate.id == previewPageId; })[0];
-			drawLedFrame(previewCanvas, textToColumns(previewItem.preview));
+			var previewStr = (previewItem.id === 'text' && currentCustomText != null)
+				? currentCustomText
+				: previewItem.preview;
+			drawLedFrame(previewCanvas, textToColumns(previewStr));
 
 			for (var i = 0; i < previewButtons.children.length; i++) {
 				var button = previewButtons.children[i];
@@ -466,6 +471,94 @@ return view.extend({
 		o.datatype = 'uinteger';
 		o.default = '0';
 		o.description = _('Seconds to stay on each page before switching. Set to 0 for manual button flipping only (no auto-rotation). Greater than 0 enables automatic flipping.');
+		o = s.option(form.Value, 'custom_text', _('Custom Text Content'));
+		o.default = 'ATHENA';
+		o.rmempty = false;
+		o.forcewrite = true;
+		o.description = _('Text displayed on the custom text page. Automatically restricted to 27 LED dot matrix columns.');
+
+		o.load = function(section_id) {
+			var val = this.map.data.get(this.map.config, section_id, this.option);
+			if (val == null || val === '')
+				val = 'ATHENA';
+			currentCustomText = String(val);
+			this.cfgvalue(section_id, currentCustomText);
+			return currentCustomText;
+		};
+
+		o.validate = function(section_id, value) {
+			var val = (value != null && value !== '') ? String(value).trim() : currentCustomText;
+			if (!val || val.length === 0)
+				return _('Custom text cannot be empty.');
+			var cols = textToColumns(val);
+			if (cols.length > 27)
+				return _('Text exceeds 27 LED columns (currently %d columns).').format(cols.length);
+			return true;
+		};
+
+		o.formvalue = function(section_id) {
+			var node = document.getElementById('widget.cbid.athena-led-c.' + section_id + '.custom_text') ||
+			           document.querySelector('input[name="cbid.athena-led-c.' + section_id + '.custom_text"]');
+			var val = node ? node.value : (currentCustomText || this.cfgvalue(section_id) || 'ATHENA');
+			val = String(val || '').trim();
+			while (val.length > 0 && textToColumns(val).length > 27)
+				val = val.slice(0, -1);
+			return (val.length > 0) ? val : 'ATHENA';
+		};
+
+		o.write = function(section_id, formvalue) {
+			var val = (formvalue != null && formvalue !== '') ? String(formvalue).trim() : 'ATHENA';
+			while (val.length > 0 && textToColumns(val).length > 27)
+				val = val.slice(0, -1);
+			if (!val) val = 'ATHENA';
+			currentCustomText = val;
+			this.cfgvalue(section_id, val);
+			return this.map.data.set(this.map.config, section_id, this.option, val);
+		};
+
+		o.renderWidget = function(section_id, option_index, cfgvalue) {
+			var initialVal = (cfgvalue != null && cfgvalue !== '') ? String(cfgvalue) : (currentCustomText || 'ATHENA');
+			currentCustomText = initialVal;
+
+			var inputEl = E('input', {
+				type: 'text',
+				id: 'widget.cbid.athena-led-c.' + section_id + '.custom_text',
+				name: 'cbid.athena-led-c.' + section_id + '.custom_text',
+				'class': 'cbi-input-text',
+				value: initialVal,
+				style: 'max-width:260px;font-family:monospace;font-weight:bold;'
+			});
+
+			var widthHint = E('span', {
+				style: 'margin-left:8px;font-size:12px;color:#6c757d;'
+			});
+
+			function updateInputState() {
+				var val = inputEl.value;
+				while (val.length > 0 && textToColumns(val).length > 27) {
+					val = val.slice(0, -1);
+					inputEl.value = val;
+				}
+				var colCount = textToColumns(inputEl.value).length;
+				widthHint.textContent = _('Dot Matrix Width: %d/27 columns').format(colCount);
+				currentCustomText = inputEl.value;
+				o.cfgvalue(section_id, currentCustomText);
+				if (previewPageId === 'text')
+					updatePreview('text');
+			}
+
+			inputEl.addEventListener('input', updateInputState);
+			inputEl.addEventListener('keyup', updateInputState);
+			inputEl.addEventListener('change', updateInputState);
+
+			updateInputState();
+
+			return E('div', { style: 'display:flex;align-items:center;flex-wrap:wrap;gap:8px;' }, [
+				inputEl,
+				widthHint
+			]);
+		};
+
 
 		o = s.option(form.Value, 'net_interface', _('Traffic Monitor Interface'));
 		o.default = 'wan';

@@ -21,6 +21,7 @@ typedef struct {
     double net_smoothing_secs;     /* --net-smoothing-secs, default 2; 0 = raw */
     uint8_t brightness;     /* --brightness, 0..7 */
     const char *net_if;     /* --net-interface */
+    const char *custom_text; /* --custom-text */
     page_id_t pages[PAGE_COUNT];
     size_t num_pages;
 } app_args_t;

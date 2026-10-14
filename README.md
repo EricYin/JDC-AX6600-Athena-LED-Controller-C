@@ -48,6 +48,7 @@
 | `temp` | 系统温度 | `T 45.52` | 分别显示 CPU 与 NSS 核心温度 |
 | `date` | 公历日期 | `10-14` | 紧凑显示月-日 |
 | `lunar` | 中国农历 | `L:9.4` | 纯本地查表计算（含闰月） |
+| `text` | 自定义文本 | `ATHENA` | 自定义文字，输入时实时限制在 27 列以内 |
 
 ---
 
@@ -129,6 +130,7 @@ Options:
 config main 'main'
 	option enabled '1'
 	option screen_on '1'
+	option custom_text 'ATHENA'
 	option brightness '5'
 	option page_secs '0'
 	list pages 'time'

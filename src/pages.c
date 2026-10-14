@@ -1,10 +1,40 @@
 #include "pages.h"
-
+#include "font.h"
 #include "lunar.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
+static char g_custom_text[64] = "ATHENA";
+
+void pages_set_custom_text(const char *text)
+{
+    if (!text || !*text) {
+        snprintf(g_custom_text, sizeof(g_custom_text), "ATHENA");
+        return;
+    }
+
+    char tmp[64];
+    snprintf(tmp, sizeof(tmp), "%s", text);
+
+    uint8_t dummy[256];
+    while (strlen(tmp) > 0 && font_render(tmp, dummy, sizeof(dummy)) > 27) {
+        tmp[strlen(tmp) - 1] = '\0';
+    }
+
+    if (strlen(tmp) == 0)
+        snprintf(g_custom_text, sizeof(g_custom_text), "ATHENA");
+    else
+        snprintf(g_custom_text, sizeof(g_custom_text), "%s", tmp);
+}
+
+const char *pages_get_custom_text(void)
+{
+    return g_custom_text;
+}
+
 
 static void local_now(struct tm *tm)
 {
@@ -36,6 +66,9 @@ void page_render(page_id_t page, const monitor_t *mon, char *buf, size_t len)
         /* Lunar date L:M.D (17 cols, centered) */
         lunar_today(buf, len);
         break;
+    case PAGE_TEXT:
+        snprintf(buf, len, "%s", g_custom_text);
+        break;
     case PAGE_CPU:
         monitor_format_cpu(mon, buf, len);
         break;
@@ -61,7 +94,7 @@ const char *page_name(page_id_t page)
 {
     static const char *names[PAGE_COUNT] = {
         "time", "net_down", "net_up",
-        "mem", "cpu", "temp", "date", "lunar"
+        "mem", "cpu", "temp", "date", "lunar", "text"
     };
     if ((int)page < 0 || page >= PAGE_COUNT) return "?";
     return names[page];
@@ -73,6 +106,7 @@ page_id_t page_from_name(const char *name)
     if (strcmp(name, "time") == 0) return PAGE_TIME;
     if (strcmp(name, "date") == 0) return PAGE_DATE;
     if (strcmp(name, "lunar") == 0) return PAGE_LUNAR;
+    if (strcmp(name, "text") == 0 || strcmp(name, "custom") == 0) return PAGE_TEXT;
     if (strcmp(name, "cpu") == 0) return PAGE_CPU;
     if (strcmp(name, "mem") == 0) return PAGE_MEM;
     if (strcmp(name, "temp") == 0) return PAGE_TEMP;

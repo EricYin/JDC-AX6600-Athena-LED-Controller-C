@@ -11,6 +11,7 @@ load_uci() {
 	config_load athena-led-c
 	config_get_bool enabled main enabled 1
 	config_get_bool screen_on main screen_on 1
+	config_get custom_text main custom_text "ATHENA"
 	config_get brightness main brightness 5
 	config_get page_secs main page_secs 0
 	config_get poll_ms main poll_ms 250
@@ -40,6 +41,7 @@ start_service() {
 	procd_open_instance
 	procd_set_param command "$PROG" \
 		--screen-on "$screen_on" \
+		--custom-text "$custom_text" \
 		--brightness "$brightness" \
 		--page-secs "$page_secs" \
 		--poll-ms "$poll_ms" \
