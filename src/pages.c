@@ -60,8 +60,8 @@ void page_render(page_id_t page, const monitor_t *mon, char *buf, size_t len)
 const char *page_name(page_id_t page)
 {
     static const char *names[PAGE_COUNT] = {
-        "time", "date", "lunar",
-        "cpu", "mem", "temp", "net_down", "net_up"
+        "time", "net_down", "net_up",
+        "mem", "cpu", "temp", "date", "lunar"
     };
     if ((int)page < 0 || page >= PAGE_COUNT) return "?";
     return names[page];

@@ -15,10 +15,10 @@ PREFIX   ?= /usr
 BINDIR   ?= $(PREFIX)/bin
 DESTDIR  ?=
 
-BIN      := athena-led-c
+BUILDDIR := build
+BIN      := $(BUILDDIR)/athena-led-c
 SRCDIR   := src
 INCDIR   := include
-BUILDDIR := build
 
 # -std=c11 keeps the code strictly standard C; POSIX APIs (clock_gettime,
 # termios, /proc, /sys) are opt-in via _POSIX_C_SOURCE.
@@ -44,11 +44,11 @@ $(BUILDDIR):
 
 install: $(BIN)
 	install -d $(DESTDIR)$(BINDIR)
-	install -m 0755 $(BIN) $(DESTDIR)$(BINDIR)/$(BIN)
+	install -m 0755 $(BIN) $(DESTDIR)$(BINDIR)/athena-led-c
 
 clean:
 	rm -f $(OBJS) $(BIN)
 	rm -rf $(BUILDDIR)
 
 test: $(BIN)
-	$(CURDIR)/$(BIN) --self-test
+	$(BIN) --self-test

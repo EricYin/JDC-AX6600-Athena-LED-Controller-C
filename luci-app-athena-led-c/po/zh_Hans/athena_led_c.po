@@ -34,8 +34,8 @@ msgstr "点击功能按钮即可预览。"
 msgid "Display Pages"
 msgstr "显示页面选择"
 
-msgid "Only checked features are saved to the rotation list."
-msgstr "仅勾选的功能会保存到轮播列表。"
+msgid "Only checked features are saved to the rotation list. Use the arrows to change the display order."
+msgstr "仅勾选的功能会保存到轮播列表；使用箭头调整显示顺序。"
 
 msgid "Time"
 msgstr "时钟"
@@ -109,6 +109,12 @@ msgstr " (默认)"
 msgid " (Brightest)"
 msgstr " (最亮)"
 
+msgid "Move up"
+msgstr "上移"
+
+msgid "Move down"
+msgstr "下移"
+
 msgid "Page Display Time (seconds)"
 msgstr "页面停留时间 (秒)"
 
@@ -168,3 +174,9 @@ msgstr "网络指示灯阈值 (KB/s)"
 
 msgid "Light the up/down indicators when the corresponding direction exceeds this rate in KB/s (1 KB = 1000 bytes)."
 msgstr "当上传或下载速率超过该 KB/s 阈值时点亮对应方向指示灯（1 KB = 1000 字节）。"
+
+msgid "Daemon"
+msgstr "核心守护进程"
+
+msgid "WebUI"
+msgstr "Web 控制台"

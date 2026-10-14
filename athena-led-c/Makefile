@@ -3,8 +3,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=athena-led-c
-PKG_VERSION:=0.2.0
-PKG_RELEASE:=1
+PKG_VERSION:=0.3.0
 PKG_LICENSE:=Apache-2.0
 PKG_MAINTAINER:=perlyz
 
@@ -45,7 +44,7 @@ endef
 
 define Package/athena-led-c/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/athena-led-c $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/build/athena-led-c $(1)/usr/bin/athena-led-c
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/athena-led-c.init $(1)/etc/init.d/athena-led-c
 	$(INSTALL_DIR) $(1)/etc/config

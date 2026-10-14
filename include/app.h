@@ -1,3 +1,5 @@
+#define ATHENA_LED_VERSION "0.3.0"
+
 #ifndef ATHENA_APP_H
 #define ATHENA_APP_H
 

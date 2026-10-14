@@ -9,6 +9,7 @@ src/
   font.c          27×5 点阵字模表与文本→列数据渲染
   sim.c           PC 终端模拟器（■/· 输出、非阻塞键盘输入）
   screen.c        TM1628A 硬件驱动（GPIO cdev + sysfs 双后端）
+  button.c        物理按键监听与信号响应（单击/双击/长按状态机）
   monitor.c       本地系统监控（/proc、/sys 采样）
   lunar.c         公历→农历转换（1900–2100 查表法）
   sun.c           NOAA 日出日落本地算法
@@ -19,7 +20,7 @@ src/
 ```
 monitor_poll() ─┐
                 ├─> page_render() ─> font_render() ─> [scroll/center] ─> screen_write_frame()/sim_print_frame()
-按钮事件 ────────┘（v0.2 接入）
+按钮事件 ────────┘
 ```
 
 每 `--poll-ms`（默认 250ms）执行一轮：采样 → 渲染 → 输出 → `clock_nanosleep()`

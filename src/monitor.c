@@ -1,4 +1,5 @@
 #include "monitor.h"
+#include "pages.h"
 
 #include <ctype.h>
 #include <math.h>
@@ -191,18 +192,18 @@ static void poll_net(monitor_t *m)
 
 unsigned monitor_poll_mask_page(int page)
 {
-    switch (page) {
-    case 3: /* PAGE_CPU */
+    switch ((page_id_t)page) {
+    case PAGE_CPU:
         return MONITOR_POLL_CPU;
-    case 4: /* PAGE_MEM */
+    case PAGE_MEM:
         return MONITOR_POLL_MEM;
-    case 5: /* PAGE_TEMP */
+    case PAGE_TEMP:
         return MONITOR_POLL_TEMP;
-    case 6: /* PAGE_NET_DOWN */
-    case 7: /* PAGE_NET_UP */
+    case PAGE_NET_DOWN:
+    case PAGE_NET_UP:
         return MONITOR_POLL_NET;
     default:
-        /* TIME (0), DATE (1), LUNAR (2): no file I/O */
+        /* TIME, DATE, LUNAR: no file I/O */
         return 0;
     }
 }

@@ -15,7 +15,7 @@ static void usage(FILE *out)
 "  --sim, --test             run terminal simulator (27x5, ■/·)\n"
 "  --no-clear                simulator: do not clear terminal each frame\n"
 "  --pages LIST              comma/space separated pages to display:\n"
-"                            time,date,lunar,cpu,mem,temp,net_down,net_up\n"
+"                            time,net_down,net_up,mem,cpu,temp,date,lunar\n"
 "  --page NAME               add a single page to the display rotation\n"
 "  --page-secs N             seconds per page (0 = manual button switch only)\n"
 "  --poll-ms N               sampling interval in ms (default 250)\n"
@@ -25,6 +25,7 @@ static void usage(FILE *out)
 "  --brightness 0..7         panel brightness (default 5)\n"
 "  --net-interface NAME      interface for throughput (default wan)\n"
 "  --self-test               run built-in tests and exit\n"
+"  -v, --version             show version and exit\n"
 "  -h, --help                show this help\n",
     out);
 }
@@ -67,6 +68,9 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
             a->no_clear = true;
         } else if (strcmp(arg, "--self-test") == 0) {
             a->self_test = true;
+        } else if (strcmp(arg, "-v") == 0 || strcmp(arg, "--version") == 0) {
+            printf("athena-led-c %s\n", ATHENA_LED_VERSION);
+            return 1;
         } else if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
             usage(stdout);
             return 1;

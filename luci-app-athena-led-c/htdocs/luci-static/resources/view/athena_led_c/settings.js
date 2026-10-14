@@ -7,6 +7,9 @@
 'require poll';
 'require network';
 
+var LUCI_APP_VERSION = '0.3.0';
+var CORE_VERSION = '0.3.0';
+
 /*
  * Athena LED Controller — LuCI JS Settings View
  * For JDCloud AX6600 (RE-CS-02) Pure C LED Daemon
@@ -14,31 +17,35 @@
  */
 
 function getServiceStatus() {
-	return fs.read('/var/run/athena-led-c.pid').then(function(pid) {
-		pid = (pid || '').trim();
+	return Promise.all([
+		fs.read('/var/run/athena-led-c.pid').catch(function() { return ''; }),
+		fs.read('/var/run/athena-led-c.version').catch(function() { return ''; })
+	]).then(function(res) {
+		var pid = (res[0] || '').trim();
+		var ver = (res[1] || '').trim() || CORE_VERSION;
 		if (pid && /^\d+$/.test(pid)) {
 			return fs.read('/proc/' + pid + '/cmdline').then(function(cmdline) {
 				if ((cmdline || '').indexOf('athena-led-c') !== -1)
-					return { running: true, pid: pid };
-				return checkPidof();
+					return { running: true, pid: pid, version: ver };
+				return checkPidof(ver);
 			}, function() {
-				return checkPidof();
+				return checkPidof(ver);
 			});
 		}
-		return checkPidof();
+		return checkPidof(ver);
 	}).catch(function() {
-		return checkPidof();
+		return checkPidof(CORE_VERSION);
 	});
 }
 
-function checkPidof() {
+function checkPidof(ver) {
 	return fs.exec_direct('/bin/pidof', ['athena-led-c']).then(function(res) {
 		var pid = (res || '').trim().split(/\s+/)[0];
 		if (pid && /^\d+$/.test(pid))
-			return { running: true, pid: pid };
-		return { running: false };
+			return { running: true, pid: pid, version: ver || CORE_VERSION };
+		return { running: false, version: ver || CORE_VERSION };
 	}).catch(function() {
-		return { running: false };
+		return { running: false, version: ver || CORE_VERSION };
 	});
 }
 
@@ -124,13 +131,13 @@ function drawLedFrame(canvas, cols) {
 // 8 个纯本地功能项（无日出日落）
 var PAGE_ITEMS = [
 	{ id: 'time',     label: _('Time'),        icon: '🕒', preview: '12^34^56' },
-	{ id: 'date',     label: _('Date'),        icon: '📅', preview: '10-13' },
-	{ id: 'lunar',    label: _('Lunar'),       icon: '🏮', preview: 'L:9.4' },
-	{ id: 'cpu',      label: _('CPU'),         icon: '💻', preview: 'C^;12%' },
-	{ id: 'mem',      label: _('Memory'),      icon: '💾', preview: 'M^;35%' },
-	{ id: 'temp',     label: _('Temperature'), icon: '🌡️', preview: 'T^45.52' },
 	{ id: 'net_down', label: _('Download'),    icon: '⬇️', preview: 'D^;12.5M' },
-	{ id: 'net_up',   label: _('Upload'),      icon: '⬆️', preview: 'U^;;1.8M' }
+	{ id: 'net_up',   label: _('Upload'),      icon: '⬆️', preview: 'U^;;1.8M' },
+	{ id: 'mem',      label: _('Memory'),      icon: '💾', preview: 'M^;35%' },
+	{ id: 'cpu',      label: _('CPU'),         icon: '💻', preview: 'C^;12%' },
+	{ id: 'temp',     label: _('Temperature'), icon: '🌡️', preview: 'T^45.52' },
+	{ id: 'date',     label: _('Date'),        icon: '📅', preview: '10-13' },
+	{ id: 'lunar',    label: _('Lunar'),       icon: '🏮', preview: 'L:9.4' }
 ];
 
 function buildButtonHelpBox() {
@@ -233,23 +240,30 @@ return view.extend({
 		previewSection.appendChild(previewButtons);
 		previewSection.appendChild(previewCanvas);
 
+		function findItem(pageId) {
+			return PAGE_ITEMS.filter(function(item) {
+				return item.id == pageId;
+			})[0];
+		}
+
 		var pagesOption = s.option(form.Value, 'pages', _('Display Pages'));
 		pagesOption.rmempty = false;
 		pagesOption.forcewrite = true;
-		pagesOption.description = _('Only checked features are saved to the rotation list.');
+		pagesOption.description = _('Only checked features are saved to the rotation list. Use the arrows to change the display order.');
 
 		pagesOption.load = function(section_id) {
 			var value = this.map.data.get(this.map.config, section_id, this.option);
 			var configured = (value == null) ? [] : (Array.isArray(value) ? value : String(value).split(/[\s,]+/));
-			var valid = configured.filter(function(page) {
-				return PAGE_ITEMS.some(function(item) { return item.id == page; });
-			});
+			var selected = [];
+			for (var i = 0; i < configured.length; i++) {
+				var p = configured[i];
+				if (findItem(p) && selected.indexOf(p) == -1)
+					selected.push(p);
+			}
 
-			// A missing pages option means all pages are enabled (legacy
-			// behavior). Once configured, use exactly the configured list.
-			var selected = (value == null && configured.length == 0)
-				? PAGE_ITEMS.map(function(item) { return item.id; })
-				: valid.filter(function(page, index) { return configured.indexOf(page) == index; });
+			// A missing pages option means all pages are enabled (legacy behavior)
+			if (value == null && configured.length == 0)
+				selected = PAGE_ITEMS.map(function(item) { return item.id; });
 
 			this.cfgvalue(section_id, selected);
 			return selected;
@@ -264,60 +278,137 @@ return view.extend({
 				style: 'display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;'
 			});
 
-			PAGE_ITEMS.forEach(function(item) {
-				var row = E('div', {
-					style: 'display:inline-flex;align-items:center;padding:7px 12px;' +
-					       'background:#f8f9fa;border:1px solid #ced4da;border-radius:6px;user-select:none;'
+			function renderCards() {
+				cardsContainer.innerHTML = '';
+
+				// Checked cards follow the configured display order. Unchecked
+				// cards stay visible below them so all features remain editable.
+				var displayItems = selectedValues.map(findItem).filter(Boolean);
+				PAGE_ITEMS.forEach(function(item) {
+					if (selectedValues.indexOf(item.id) == -1)
+						displayItems.push(item);
 				});
 
-				var cb = E('input', {
-					type: 'checkbox',
-					'data-page-id': item.id,
-					style: 'margin:0 8px 0 0;transform:scale(1.15);cursor:pointer;'
+				displayItems.forEach(function(item) {
+					var selectedIndex = selectedValues.indexOf(item.id);
+					var row = E('div', {
+						style: 'display:inline-flex;align-items:center;gap:8px;padding:7px 12px;' +
+						       'background:#f8f9fa;border:1px solid #ced4da;border-radius:6px;user-select:none;'
+					});
+
+					if (selectedIndex != -1) {
+						row.appendChild(E('span', {
+							'class': 'cbi-badge',
+							style: 'min-width:20px;height:20px;line-height:20px;text-align:center;' +
+							       'background:#ffb020;color:#231000;border-radius:999px;font-size:11px;font-weight:600;'
+						}, String(selectedIndex + 1)));
+					}
+
+					var cb = E('input', {
+						type: 'checkbox',
+						'data-page-id': item.id,
+						style: 'margin:0;transform:scale(1.15);cursor:pointer;'
+					});
+
+					// Set the DOM property, not the HTML attribute. E() calls
+					// setAttribute(), where checked="false" still means checked.
+					cb.checked = selectedIndex != -1;
+
+					var label = E('span', { style: 'font-weight:500;font-size:13px;cursor:pointer;' },
+						item.icon + ' ' + item.label);
+
+					function syncSelection() {
+						var index = selectedValues.indexOf(item.id);
+						if (cb.checked && index == -1)
+							selectedValues.push(item.id);
+						else if (!cb.checked && index != -1)
+							selectedValues.splice(index, 1);
+
+						pagesOption.cfgvalue(section_id, selectedValues);
+						renderCards();
+					}
+
+					cb.addEventListener('click', function(ev) {
+						ev.stopPropagation();
+						syncSelection();
+					});
+
+					label.addEventListener('click', function(ev) {
+						cb.checked = !cb.checked;
+						ev.preventDefault();
+						ev.stopPropagation();
+						syncSelection();
+					});
+
+					row.appendChild(cb);
+					row.appendChild(label);
+
+					if (selectedIndex != -1) {
+						var orderButtons = E('span', {
+							style: 'display:inline-flex;gap:4px;margin-left:auto;'
+						});
+
+						var moveUp = E('button', {
+							type: 'button',
+							title: _('Move up'),
+							'aria-label': _('Move up'),
+							style: 'width:26px;height:26px;min-width:26px;min-height:26px;padding:0;line-height:24px;text-align:center;font-size:13px;cursor:pointer;box-sizing:border-box;',
+							'class': 'cbi-button cbi-button-neutral'
+						}, '↑');
+						moveUp.disabled = selectedIndex == 0;
+
+						var moveDown = E('button', {
+							type: 'button',
+							title: _('Move down'),
+							'aria-label': _('Move down'),
+							style: 'width:26px;height:26px;min-width:26px;min-height:26px;padding:0;line-height:24px;text-align:center;font-size:13px;cursor:pointer;box-sizing:border-box;',
+							'class': 'cbi-button cbi-button-neutral'
+						}, '↓');
+						moveDown.disabled = selectedIndex == selectedValues.length - 1;
+
+						function moveSelected(delta) {
+							var target = selectedIndex + delta;
+							if (target < 0 || target >= selectedValues.length)
+								return;
+
+							var tmp = selectedValues[selectedIndex];
+							selectedValues[selectedIndex] = selectedValues[target];
+							selectedValues[target] = tmp;
+
+							pagesOption.cfgvalue(section_id, selectedValues);
+							renderCards();
+						}
+
+						moveUp.addEventListener('click', function(ev) {
+							ev.preventDefault();
+							ev.stopPropagation();
+							moveSelected(-1);
+						});
+
+						moveDown.addEventListener('click', function(ev) {
+							ev.preventDefault();
+							ev.stopPropagation();
+							moveSelected(1);
+						});
+
+						orderButtons.appendChild(moveUp);
+						orderButtons.appendChild(moveDown);
+						row.appendChild(orderButtons);
+					}
+
+					cardsContainer.appendChild(row);
 				});
+			}
 
-				// Set the DOM property, not the HTML attribute. E() calls
-				// setAttribute(), where checked="false" still means checked.
-				cb.checked = selectedValues.indexOf(item.id) !== -1;
-
-				var label = E('span', { style: 'font-weight:500;font-size:13px;cursor:pointer;' },
-					item.icon + ' ' + item.label);
-
-				function syncSelection() {
-					var index = selectedValues.indexOf(item.id);
-					if (cb.checked && index == -1)
-						selectedValues.push(item.id);
-					else if (!cb.checked && index != -1)
-						selectedValues.splice(index, 1);
-
-					pagesOption.cfgvalue(section_id, selectedValues);
-				}
-
-				cb.addEventListener('click', function(ev) {
-					ev.stopPropagation();
-					syncSelection();
-				});
-
-				label.addEventListener('click', function(ev) {
-					cb.checked = !cb.checked;
-					ev.preventDefault();
-					ev.stopPropagation();
-					syncSelection();
-				});
-
-				row.appendChild(cb);
-				row.appendChild(label);
-				cardsContainer.appendChild(row);
-			});
-
+			renderCards();
 			return E('div', {}, [ cardsContainer ]);
 		};
 
 		pagesOption.formvalue = function(section_id) {
 			var value = this.cfgvalue(section_id);
-			var checked = PAGE_ITEMS.filter(function(item) {
-				return Array.isArray(value) && value.indexOf(item.id) !== -1;
-			}).map(function(item) { return item.id; });
+			var checked = (Array.isArray(value) ? value : []).filter(function(pageId, index) {
+				return findItem(pageId) && value.indexOf(pageId) == index;
+			});
 
 			// The C daemon requires at least one page.
 			return checked.length > 0 ? checked : ['time'];
@@ -325,9 +416,9 @@ return view.extend({
 
 		pagesOption.write = function(section_id, formvalue) {
 			var values = Array.isArray(formvalue) ? formvalue : (formvalue ? [formvalue] : ['time']);
-			values = PAGE_ITEMS.filter(function(item) {
-				return values.indexOf(item.id) !== -1;
-			}).map(function(item) { return item.id; });
+			values = values.filter(function(pageId, index) {
+				return findItem(pageId) && values.indexOf(pageId) == index;
+			});
 
 			if (values.length == 0)
 				values = ['time'];
@@ -424,18 +515,23 @@ return view.extend({
 				E('div', { 'class': 'cbi-section-descr' }, [ statusText ])
 			]);
 
-			poll.add(function() {
+			function updateStatus() {
 				return getServiceStatus().then(function(st) {
+					var verInfo = ' | ' + _('Daemon') + ': v' + (st.version || CORE_VERSION) +
+					              ' | ' + _('WebUI') + ': v' + LUCI_APP_VERSION;
+					statusText.innerHTML = '';
 					if (st.running) {
-						statusText.innerHTML = '';
 						statusText.appendChild(E('span', { 'style': 'color:green;font-weight:bold' }, _('RUNNING')));
-						statusText.appendChild(document.createTextNode(' | PID: ' + st.pid));
+						statusText.appendChild(document.createTextNode(' | PID: ' + st.pid + verInfo));
 					} else {
-						statusText.innerHTML = '';
 						statusText.appendChild(E('span', { 'style': 'color:red;font-weight:bold' }, _('NOT RUNNING')));
+						statusText.appendChild(document.createTextNode(verInfo));
 					}
 				});
-			}, 3);
+			}
+
+			updateStatus();
+			poll.add(updateStatus, 3);
 
 			return E('div', {}, [
 				statusBox,

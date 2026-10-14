@@ -9,13 +9,13 @@
 
 typedef enum {
     PAGE_TIME = 0,
-    PAGE_DATE,
-    PAGE_LUNAR,
-    PAGE_CPU,
-    PAGE_MEM,
-    PAGE_TEMP,
     PAGE_NET_DOWN,
     PAGE_NET_UP,
+    PAGE_MEM,
+    PAGE_CPU,
+    PAGE_TEMP,
+    PAGE_DATE,
+    PAGE_LUNAR,
     PAGE_COUNT
 } page_id_t;
 
