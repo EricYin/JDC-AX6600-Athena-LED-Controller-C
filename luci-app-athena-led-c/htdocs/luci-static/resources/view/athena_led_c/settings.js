@@ -183,7 +183,7 @@ return view.extend({
 		var m, s, o;
 		var currentCustomText = 'ATHENA';
 
-		m = new form.Map('athena-led-c', _('Athena LED Controller'));
+		m = new form.Map('athena-led-c');
 
 		s = m.section(form.NamedSection, 'main', 'main', _('General Settings'));
 		s.addremove = false;
@@ -196,7 +196,7 @@ return view.extend({
 		var previewPageId = null;
 
 		var previewSection = E('div', { 'class': 'cbi-section' }, [
-			E('h3', {}, _('Screen Preview & Display Features')),
+			E('h3', {}, _('Screen Preview')),
 			E('div', { 'class': 'cbi-section-descr' }, [
 				E('p', { style: 'margin:4px 0' },
 					_('Click a feature button to preview it.'))
@@ -677,6 +677,7 @@ return view.extend({
 			poll.add(updateStatus, 3);
 
 			return E('div', {}, [
+				E('h2', { name: 'content' }, _('Athena LED Controller')),
 				statusBox,
 				previewSection,
 				mapEl,

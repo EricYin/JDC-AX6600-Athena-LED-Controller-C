@@ -25,8 +25,8 @@ msgstr "命令执行失败，返回码 %d"
 msgid "Service action \"%s\" executed successfully."
 msgstr "服务操作「%s」执行成功。"
 
-msgid "Screen Preview & Display Features"
-msgstr "屏幕点阵预览与显示功能勾选"
+msgid "Screen Preview"
+msgstr "屏幕点阵预览"
 
 msgid "Click a feature button to preview it."
 msgstr "点击功能按钮即可预览。"
