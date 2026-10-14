@@ -13,6 +13,7 @@ typedef struct {
     bool sim;               /* --sim / --test */
     bool no_clear;          /* --no-clear */
     bool self_test;         /* --self-test */
+    bool screen_on;         /* --screen-on 0|1, default true */
     unsigned page_secs;     /* --page-secs, 0 = manual only; >0 = auto rotation seconds */
     unsigned poll_ms;       /* --poll-ms, default 250 */
     double indicator_cpu_percent; /* --indicator-cpu-percent, default 5 */

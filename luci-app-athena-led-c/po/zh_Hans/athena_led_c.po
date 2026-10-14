@@ -180,3 +180,21 @@ msgstr "核心守护进程"
 
 msgid "WebUI"
 msgstr "Web 控制台"
+
+msgid "Screen Status: "
+msgstr "屏幕状态: "
+
+msgid "Screen On"
+msgstr "已点亮"
+
+msgid "Screen Standby"
+msgstr "息屏待机"
+
+msgid "Turn Off Screen"
+msgstr "立即熄屏"
+
+msgid "Turn On Screen"
+msgstr "立即亮屏"
+
+msgid "(Instant & persistent across reboots)"
+msgstr "(即时生效并持久化保存，重启路由器依然有效)"

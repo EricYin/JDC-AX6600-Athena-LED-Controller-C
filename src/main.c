@@ -14,6 +14,7 @@ static void usage(FILE *out)
 "Options:\n"
 "  --sim, --test             run terminal simulator (27x5, ■/·)\n"
 "  --no-clear                simulator: do not clear terminal each frame\n"
+"  --screen-on 0|1           initial screen power state (default 1: ON)\n"
 "  --pages LIST              comma/space separated pages to display:\n"
 "                            time,net_down,net_up,mem,cpu,temp,date,lunar\n"
 "  --page NAME               add a single page to the display rotation\n"
@@ -53,6 +54,7 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
     memset(a, 0, sizeof(*a));
     a->page_secs = 0; /* default 0: manual flip only unless configured */
     a->poll_ms = 250;
+    a->screen_on = true;
     a->indicator_cpu_percent = 5.0;
     a->indicator_net_kbytes = 10.0;
     a->net_smoothing_secs = 2.0;
@@ -88,6 +90,8 @@ int app_parse_args(app_args_t *a, int argc, char **argv)
             a->indicator_net_kbytes = strtod(argv[++i], NULL);
         } else if (strcmp(arg, "--net-smoothing-secs") == 0 && i + 1 < argc) {
             a->net_smoothing_secs = strtod(argv[++i], NULL);
+        } else if (strcmp(arg, "--screen-on") == 0 && i + 1 < argc) {
+            a->screen_on = (atoi(argv[++i]) != 0);
         } else if (strcmp(arg, "--brightness") == 0 && i + 1 < argc) {
             a->brightness = (uint8_t)(strtoul(argv[++i], NULL, 10) & 0x07);
         } else if (strcmp(arg, "--net-interface") == 0 && i + 1 < argc) {

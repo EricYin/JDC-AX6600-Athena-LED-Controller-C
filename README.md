@@ -106,6 +106,7 @@ Usage: athena-led-c [OPTIONS]
 Options:
   --sim, --test             运行终端字符模拟器 (27x5, ■/·)
   --no-clear                模拟器模式下不逐帧清屏
+  --screen-on 0|1           初始屏幕电源状态 (1 = 点亮, 0 = 息屏待机; 默认: 1)
   --pages LIST              轮播页面列表 (默认: time,net_down,net_up,mem,cpu,temp,date,lunar)
   --page NAME               追加单个页面到轮播列表
   --page-secs N             每页自动停留秒数 (0 = 仅依靠物理按键手动翻屏)
@@ -127,6 +128,7 @@ Options:
 ```uci
 config main 'main'
 	option enabled '1'
+	option screen_on '1'
 	option brightness '5'
 	option page_secs '0'
 	list pages 'time'

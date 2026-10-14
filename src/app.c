@@ -19,6 +19,26 @@
 #define COLS_MAX 256
 #define FRAME_COLS 27
 
+static void update_screen_state_file(bool on)
+{
+    FILE *f = fopen("/var/run/athena-led-c.screen", "w");
+    if (f) {
+        fprintf(f, "%d\n", on ? 1 : 0);
+        fclose(f);
+    }
+}
+
+static void persist_screen_state_uci(bool on)
+{
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd),
+             "uci -q set athena-led-c.main.screen_on='%d' && uci -q commit athena-led-c &",
+             on ? 1 : 0);
+    int rc = system(cmd);
+    (void)rc;
+}
+
+
 static volatile sig_atomic_t g_running = 1;
 
 static void on_signal(int sig)
@@ -104,7 +124,7 @@ static int run_sim(const app_args_t *a)
 
     size_t page_idx = 0;
     unsigned page_elapsed_ms = 0;
-    bool screen_on = true;
+    bool screen_on = a->screen_on;
     unsigned poll_mask = selected_poll_mask(a);
     char text[TEXT_MAX];
     uint8_t cols[COLS_MAX];
@@ -161,11 +181,20 @@ static int run_hw(const app_args_t *a)
         fprintf(stderr, "failed to init LED GPIO (cdev/sysfs)\n");
         return 1;
     }
-    if (!screen_power(&screen, true, a->brightness)) {
-        fprintf(stderr, "failed to power LED panel\n");
-        screen_close(&screen);
-        return 1;
+    bool screen_on = a->screen_on;
+    if (screen_on) {
+        if (!screen_power(&screen, true, a->brightness)) {
+            fprintf(stderr, "failed to power LED panel\n");
+            screen_close(&screen);
+            return 1;
+        }
+    } else {
+        uint8_t blank[FRAME_COLS] = {0};
+        screen_power(&screen, true, 0);
+        screen_write_frame(&screen, blank, 0);
+        screen_power(&screen, false, 0);
     }
+    update_screen_state_file(screen_on);
 
     monitor_t mon;
     monitor_init(&mon, a->net_if);
@@ -173,7 +202,6 @@ static int run_hw(const app_args_t *a)
 
     size_t page_idx = 0;
     unsigned page_elapsed_ms = 0;
-    bool screen_on = true;
     unsigned poll_mask = selected_poll_mask(a);
     char text[TEXT_MAX];
     uint8_t cols[COLS_MAX];
@@ -216,7 +244,9 @@ static int run_hw(const app_args_t *a)
                 uint8_t blank[FRAME_COLS] = {0};
                 screen_write_frame(&screen, blank, 0);
             }
-            fprintf(stderr, "[button] LONG press -> screen power %s\n",
+            update_screen_state_file(screen_on);
+            persist_screen_state_uci(screen_on);
+            fprintf(stderr, "[button] LONG press -> screen power %s (persisted to UCI)\n",
                     screen_on ? "ON" : "OFF");
             break;
         default:

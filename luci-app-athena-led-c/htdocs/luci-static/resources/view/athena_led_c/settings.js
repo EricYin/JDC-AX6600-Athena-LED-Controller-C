@@ -19,33 +19,42 @@ var CORE_VERSION = '0.3.0';
 function getServiceStatus() {
 	return Promise.all([
 		fs.read('/var/run/athena-led-c.pid').catch(function() { return ''; }),
-		fs.read('/var/run/athena-led-c.version').catch(function() { return ''; })
+		fs.read('/var/run/athena-led-c.version').catch(function() { return ''; }),
+		fs.read('/var/run/athena-led-c.screen').catch(function() { return ''; }),
+		uci.load('athena-led-c').then(function() {
+			return uci.get('athena-led-c', 'main', 'screen_on');
+		}).catch(function() { return ''; })
 	]).then(function(res) {
 		var pid = (res[0] || '').trim();
 		var ver = (res[1] || '').trim() || CORE_VERSION;
+		var screenState = (res[2] || '').trim();
+		if (!screenState)
+			screenState = (res[3] != null && res[3] !== '') ? String(res[3]).trim() : '1';
+		var screenOn = (screenState !== '0');
+
 		if (pid && /^\d+$/.test(pid)) {
 			return fs.read('/proc/' + pid + '/cmdline').then(function(cmdline) {
 				if ((cmdline || '').indexOf('athena-led-c') !== -1)
-					return { running: true, pid: pid, version: ver };
-				return checkPidof(ver);
+					return { running: true, pid: pid, version: ver, screen_on: screenOn };
+				return checkPidof(ver, screenOn);
 			}, function() {
-				return checkPidof(ver);
+				return checkPidof(ver, screenOn);
 			});
 		}
-		return checkPidof(ver);
+		return checkPidof(ver, screenOn);
 	}).catch(function() {
-		return checkPidof(CORE_VERSION);
+		return checkPidof(CORE_VERSION, true);
 	});
 }
 
-function checkPidof(ver) {
+function checkPidof(ver, screenOn) {
 	return fs.exec_direct('/bin/pidof', ['athena-led-c']).then(function(res) {
 		var pid = (res || '').trim().split(/\s+/)[0];
 		if (pid && /^\d+$/.test(pid))
-			return { running: true, pid: pid, version: ver || CORE_VERSION };
-		return { running: false, version: ver || CORE_VERSION };
+			return { running: true, pid: pid, version: ver || CORE_VERSION, screen_on: screenOn };
+		return { running: false, version: ver || CORE_VERSION, screen_on: screenOn };
 	}).catch(function() {
-		return { running: false, version: ver || CORE_VERSION };
+		return { running: false, version: ver || CORE_VERSION, screen_on: screenOn };
 	});
 }
 
@@ -510,9 +519,16 @@ return view.extend({
 		// ============================================================
 		return m.render().then(function(mapEl) {
 			var statusText = E('em', {}, _('Collecting data...'));
+			var screenControlRow = E('div', {
+				style: 'margin-top:10px;padding-top:8px;border-top:1px solid #e9ecef;display:flex;align-items:center;flex-wrap:wrap;gap:12px;'
+			});
+
 			var statusBox = E('div', { 'class': 'cbi-section' }, [
 				E('h3', {}, _('Running Status')),
-				E('div', { 'class': 'cbi-section-descr' }, [ statusText ])
+				E('div', { 'class': 'cbi-section-descr' }, [
+					statusText,
+					screenControlRow
+				])
 			]);
 
 			function updateStatus() {
@@ -524,9 +540,43 @@ return view.extend({
 						statusText.appendChild(E('span', { 'style': 'color:green;font-weight:bold' }, _('RUNNING')));
 						statusText.appendChild(document.createTextNode(' | PID: ' + st.pid + verInfo));
 					} else {
-						statusText.appendChild(E('span', { 'style': 'color:red;font-weight:bold' }, _('NOT RUNNING')));
-						statusText.appendChild(document.createTextNode(verInfo));
+						statusText.innerHTML = '<span style="color:red;font-weight:bold">' + _('NOT RUNNING') + '</span>' + verInfo;
 					}
+
+					screenControlRow.innerHTML = '';
+
+					var screenStateBadge = st.screen_on
+						? E('span', { 'class': 'cbi-badge', style: 'background:#28a745;color:#fff;font-weight:600;padding:2px 8px;border-radius:4px;' }, _('Screen On'))
+						: E('span', { 'class': 'cbi-badge', style: 'background:#6c757d;color:#fff;font-weight:600;padding:2px 8px;border-radius:4px;' }, _('Screen Standby'));
+
+					var screenStatusLabel = E('span', { style: 'display:inline-flex;align-items:center;gap:6px;' }, [
+						E('strong', {}, _('Screen Status: ')),
+						screenStateBadge
+					]);
+
+					var toggleBtn = E('button', {
+						type: 'button',
+						'class': st.screen_on ? 'cbi-button cbi-button-neutral' : 'cbi-button cbi-button-action',
+						style: 'padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;'
+					}, st.screen_on ? _('Turn Off Screen') : _('Turn On Screen'));
+
+					var persistNote = E('span', {
+						style: 'color:#6c757d;font-size:12px;'
+					}, _('(Instant & persistent across reboots)'));
+
+					toggleBtn.addEventListener('click', function(ev) {
+						ev.preventDefault();
+						toggleBtn.disabled = true;
+						return callInitAction('screen_toggle').then(function() {
+							return updateStatus();
+						}).finally(function() {
+							toggleBtn.disabled = false;
+						});
+					});
+
+					screenControlRow.appendChild(screenStatusLabel);
+					screenControlRow.appendChild(toggleBtn);
+					screenControlRow.appendChild(persistNote);
 				});
 			}
 
