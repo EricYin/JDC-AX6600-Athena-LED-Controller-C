@@ -79,8 +79,8 @@ msgstr "双击屏幕按键："
 msgid "Jump directly back to the first checked page."
 msgstr "立即跳回第一个已勾选的页面。"
 
-msgid "Long Press (1.5s): "
-msgstr "长按屏幕按键 (1.5秒)："
+msgid "Long Press (2s): "
+msgstr "长按屏幕按键 (2秒)："
 
 msgid "Toggle screen standby power (turn display ON or OFF)."
 msgstr "切换屏幕待机供电（点亮或熄灭点阵屏）。"

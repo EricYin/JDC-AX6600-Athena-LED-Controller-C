@@ -42,6 +42,9 @@ void button_notify_signal(int sig)
             g_last_click_ns = now;
         }
     } else if (sig == SIGUSR2) {
+        g_pending_short = 0;
+        g_pending_double = 0;
+        g_last_click_ns = 0;
         g_pending_long = 1;
     }
 }

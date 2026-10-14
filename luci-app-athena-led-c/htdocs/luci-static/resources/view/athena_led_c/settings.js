@@ -58,11 +58,11 @@ function checkPidof(ver, screenOn) {
 	});
 }
 
-function callInitAction(action) {
+function callInitAction(action, silent) {
 	return fs.exec('/etc/init.d/athena-led-c', [action]).then(function(res) {
 		if (res.code !== 0)
 			throw new Error(_('Command failed with code %d').format(res.code));
-		ui.addNotification(null, E('p', _('Service action "%s" executed successfully.').format(action)), 'info');
+		if (!silent) ui.addNotification(null, E('p', _('Service action "%s" executed successfully.').format(action)), 'info');
 	}).catch(function(e) {
 		ui.addNotification(null, E('p', e.message), 'error');
 	});
@@ -163,7 +163,7 @@ function buildButtonHelpBox() {
 				_('Jump directly back to the first checked page.')
 			]),
 			E('p', { style: 'margin:4px 0' }, [
-				E('strong', {}, _('Long Press (1.5s): ')),
+				E('strong', {}, _('Long Press (2s): ')),
 				_('Toggle screen standby power (turn display ON or OFF).')
 			])
 		])
@@ -660,7 +660,7 @@ return view.extend({
 					toggleBtn.addEventListener('click', function(ev) {
 						ev.preventDefault();
 						toggleBtn.disabled = true;
-						return callInitAction('screen_toggle').then(function() {
+						return callInitAction('screen_toggle', true).then(function() {
 							return updateStatus();
 						}).finally(function() {
 							toggleBtn.disabled = false;

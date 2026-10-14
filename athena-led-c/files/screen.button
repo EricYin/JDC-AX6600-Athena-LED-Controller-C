@@ -3,10 +3,30 @@ logger -t athena-btn "BUTTON=$BUTTON ACTION=$ACTION SEEN=$SEEN"
 PID=$(cat /var/run/athena-led-c.pid 2>/dev/null)
 [ -n "$PID" ] || exit 0
 
-if [ "$ACTION" = "released" ]; then
+FLAG_FILE="/var/run/athena-led-c.btn-timeout"
+
+case "$ACTION" in
+pressed)
+    rm -f "$FLAG_FILE"
+    exit 2
+    ;;
+timeout)
+    touch "$FLAG_FILE"
+    logger -t athena-btn "Triggering LONG PRESS via procd timeout (2s)"
+    kill -USR2 "$PID" 2>/dev/null || true
+    ;;
+released)
+    if [ -f "$FLAG_FILE" ]; then
+        rm -f "$FLAG_FILE"
+        exit 0
+    fi
     if [ "${SEEN:-0}" -ge 2 ]; then
+        logger -t athena-btn "Triggering LONG PRESS on release (SEEN=$SEEN)"
         kill -USR2 "$PID" 2>/dev/null || true
     else
+        logger -t athena-btn "Triggering SHORT CLICK on release (SEEN=$SEEN)"
         kill -USR1 "$PID" 2>/dev/null || true
     fi
-fi
+    ;;
+esac
+exit 0

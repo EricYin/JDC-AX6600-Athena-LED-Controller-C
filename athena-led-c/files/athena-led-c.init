@@ -36,6 +36,7 @@ start_service() {
 	load_uci
 	[ "$enabled" -gt 0 ] || return 0
 	mkdir -p /var/run
+	rm -f /var/run/athena-led-c.btn-timeout
 	echo "0.3.0" > /var/run/athena-led-c.version
 
 	procd_open_instance
@@ -67,7 +68,7 @@ reload_service() {
 }
 
 stop_service() {
-	rm -f /var/run/athena-led-c.version /var/run/athena-led-c.screen
+	rm -f /var/run/athena-led-c.version /var/run/athena-led-c.screen /var/run/athena-led-c.btn-timeout
 }
 screen_toggle() {
 	PID=$(cat /var/run/athena-led-c.pid 2>/dev/null)
