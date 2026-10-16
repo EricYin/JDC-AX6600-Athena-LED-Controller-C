@@ -2,7 +2,10 @@
 set -e
 
 REPO_DIR="/data00/repos/JDC-AX6600-Athena-LED-Controller-C"
-IM_DIR="/home/perly/workspace/repos/immortalwrt"
+IM_DIR="${IM_DIR:-/data00/repos/immortalwrt}"
+VERSION="${1:-$(cat "${REPO_DIR}/VERSION" 2>/dev/null || grep -oE '[0-9]+\.[0-9]+\.[0-9]+' "${REPO_DIR}/include/app.h" | head -n1)}"
+
+echo "Building distribution for athena-led-c v${VERSION}..."
 DIST_DIR="${REPO_DIR}/dist"
 STAGING_HOST="${IM_DIR}/staging_dir/hostpkg/bin"
 TOOLCHAIN_BIN="${IM_DIR}/staging_dir/toolchain-aarch64_cortex-a53_gcc-14.3.0_musl/bin"
@@ -35,8 +38,8 @@ cp -f "${DIST_DIR}/i18n/athena_led_c.zh-cn.lmo" "${DIST_DIR}/i18n/athena_led_c.z
 
 echo "=== 4. 拷贝 ImmortalWrt 编译出的 APK 安装包 ==="
 mkdir -p "${DIST_DIR}/apk"
-cp -f "${IM_DIR}/bin/packages/aarch64_cortex-a53/base/athena-led-c-0.4.0"*.apk "${DIST_DIR}/apk/" 2>/dev/null || true
-cp -f "${IM_DIR}/bin/packages/aarch64_cortex-a53/base/luci-app-athena-led-c-0.4.0"*.apk "${DIST_DIR}/apk/" 2>/dev/null || true
+find "${IM_DIR}/bin/packages/aarch64_cortex-a53" -name "athena-led-c-*.apk" -exec cp -f {} "${DIST_DIR}/apk/athena-led-c-${VERSION}.apk" \; 2>/dev/null || true
+find "${IM_DIR}/bin/packages/aarch64_cortex-a53" -name "luci-app-athena-led-c-*.apk" -exec cp -f {} "${DIST_DIR}/apk/luci-app-athena-led-c-${VERSION}.apk" \; 2>/dev/null || true
 
 echo "=== 5. 构建通用 IPK 安装包 ==="
 mkdir -p "${DIST_DIR}/ipk"
@@ -57,9 +60,9 @@ chmod 755 "${TMP_IPK}/data/etc/rc.button/screen"
 ln -sf screen "${TMP_IPK}/data/etc/rc.button/BTN_1"
 ln -sf screen "${TMP_IPK}/data/etc/rc.button/btn_1"
 
-cat << 'CPKG' > "${TMP_IPK}/control/control"
+cat << CPKG > "${TMP_IPK}/control/control"
 Package: athena-led-c
-Version: 0.4.0
+Version: ${VERSION}
 Depends: libc
 Section: utils
 Architecture: aarch64_cortex-a53
@@ -79,7 +82,7 @@ chmod 755 "${TMP_IPK}/control/postinst"
 echo "2.0" > "${TMP_IPK}/debian-binary"
 tar -C "${TMP_IPK}/control" -czf "${TMP_IPK}/control.tar.gz" .
 tar -C "${TMP_IPK}/data" -czf "${TMP_IPK}/data.tar.gz" .
-tar -C "${TMP_IPK}" -czf "${DIST_DIR}/ipk/athena-led-c_0.4.0_aarch64_cortex-a53.ipk" debian-binary control.tar.gz data.tar.gz
+tar -C "${TMP_IPK}" -czf "${DIST_DIR}/ipk/athena-led-c_${VERSION}_aarch64_cortex-a53.ipk" debian-binary control.tar.gz data.tar.gz
 rm -rf "${TMP_IPK}"
 
 # 5.2 构建 luci-app-athena-led-c.ipk
@@ -100,9 +103,9 @@ cp -f "${REPO_DIR}/luci-app-athena-led-c/root/usr/share/rpcd/acl.d/luci-app-athe
 cp -f "${DIST_DIR}/i18n/athena_led_c.zh-cn.lmo" "${TMP_IPK}/data/usr/lib/lua/luci/i18n/"
 cp -f "${DIST_DIR}/i18n/athena_led_c.zh_Hans.lmo" "${TMP_IPK}/data/usr/lib/lua/luci/i18n/"
 
-cat << 'CPKG' > "${TMP_IPK}/control/control"
+cat << CPKG > "${TMP_IPK}/control/control"
 Package: luci-app-athena-led-c
-Version: 0.4.0
+Version: ${VERSION}
 Depends: athena-led-c, luci-base
 Section: luci
 Architecture: all
@@ -123,7 +126,7 @@ chmod 755 "${TMP_IPK}/control/postinst"
 echo "2.0" > "${TMP_IPK}/debian-binary"
 tar -C "${TMP_IPK}/control" -czf "${TMP_IPK}/control.tar.gz" .
 tar -C "${TMP_IPK}/data" -czf "${TMP_IPK}/data.tar.gz" .
-tar -C "${TMP_IPK}" -czf "${DIST_DIR}/ipk/luci-app-athena-led-c_0.4.0_all.ipk" debian-binary control.tar.gz data.tar.gz
+tar -C "${TMP_IPK}" -czf "${DIST_DIR}/ipk/luci-app-athena-led-c_${VERSION}_all.ipk" debian-binary control.tar.gz data.tar.gz
 rm -rf "${TMP_IPK}"
 
 echo "=== 6. 构建直接解压全量包 (athena-led-c-bundle.tar.gz) ==="

@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-JDCloud%20AX6600%20(RE--CS--02)-brightgreen.svg)](#)
 [![Language](https://img.shields.io/badge/language-C11-orange.svg)](#)
-[![Release](https://img.shields.io/badge/release-v0.4.0-blue.svg)](https://github.com/perlyz/JDC-AX6600-Athena-LED-Controller-C/releases)
+[![Release](https://img.shields.io/github/v/release/perlyz/JDC-AX6600-Athena-LED-Controller-C?color=blue)](https://github.com/perlyz/JDC-AX6600-Athena-LED-Controller-C/releases)
 
 京东云雅典娜路由器（JDCloud AX6600 / RE-CS-02）前置 27×5 LED 点阵屏控制程序与配套 LuCI Web 管理界面。
 
