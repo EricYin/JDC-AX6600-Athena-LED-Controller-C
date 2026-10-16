@@ -1,0 +1,22 @@
+{
+	"luci-app-athena-led-c": {
+		"description": "Grant access to Athena LED daemon configuration and control",
+		"read": {
+			"uci": [ "athena-led-c" ],
+			"file": {
+				"/var/run/athena-led-c.pid": [ "read" ],
+				"/var/run/athena-led-c.version": [ "read" ],
+				"/var/run/athena-led-c.screen": [ "read" ],
+				"/proc/*/cmdline": [ "read" ]
+			}
+		},
+		"write": {
+			"uci": [ "athena-led-c" ],
+			"file": {
+				"/bin/pidof": [ "exec" ],
+				"/etc/init.d/athena-led-c": [ "exec" ],
+				"/etc/init.d/athena-led-c *": [ "exec" ]
+			}
+		}
+	}
+}

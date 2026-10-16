@@ -1,0 +1,14 @@
+{
+	"admin/services/athena_led_c": {
+		"title": "Athena LED",
+		"order": 60,
+		"action": {
+			"type": "view",
+			"path": "athena_led_c/settings"
+		},
+		"depends": {
+			"acl": [ "luci-app-athena-led-c" ],
+			"uci": { "athena-led-c": true }
+		}
+	}
+}
