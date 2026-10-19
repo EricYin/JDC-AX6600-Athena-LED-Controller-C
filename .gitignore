@@ -2,6 +2,6 @@ build/
 *.o
 *.d
 !*.d/
-athena-led-c
+/athena-led-c
 core
 dist/

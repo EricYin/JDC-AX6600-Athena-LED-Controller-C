@@ -2,7 +2,7 @@
 set -e
 
 if [ -z "$1" ]; then
-    echo "Usage: $0 <version> (e.g. 0.4.1)"
+    echo "Usage: $0 <version> (e.g. 0.4.2)"
     exit 1
 fi
 
@@ -27,5 +27,8 @@ sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${NEW_VER}/" "${REPO_DIR}/luci-app-athena
 # 5. luci-app-athena-led-c settings.js
 sed -i "s/var LUCI_APP_VERSION = '.*';/var LUCI_APP_VERSION = '${NEW_VER}';/" "${REPO_DIR}/luci-app-athena-led-c/htdocs/luci-static/resources/view/athena_led_c/settings.js"
 sed -i "s/var CORE_VERSION = '.*';/var CORE_VERSION = '${NEW_VER}';/" "${REPO_DIR}/luci-app-athena-led-c/htdocs/luci-static/resources/view/athena_led_c/settings.js"
+
+# 6. athena-led-c init script fallback version
+sed -i "s/echo \"[0-9]\+\.[0-9]\+\.[0-9]\+\" > \/var\/run\/athena-led-c\.version/echo \"${NEW_VER}\" > \/var\/run\/athena-led-c\.version/" "${REPO_DIR}/athena-led-c/files/athena-led-c.init"
 
 echo "Version successfully bumped to ${NEW_VER}!"

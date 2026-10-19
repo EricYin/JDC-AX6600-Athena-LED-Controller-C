@@ -1,4 +1,4 @@
-#define ATHENA_LED_VERSION "0.4.1"
+#define ATHENA_LED_VERSION "0.4.2"
 
 #ifndef ATHENA_APP_H
 #define ATHENA_APP_H

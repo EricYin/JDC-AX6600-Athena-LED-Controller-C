@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-athena-led-c
-PKG_VERSION:=0.4.1
+PKG_VERSION:=0.4.2
 
 PKG_MAINTAINER:=perlyz
 PKG_LICENSE:=Apache-2.0

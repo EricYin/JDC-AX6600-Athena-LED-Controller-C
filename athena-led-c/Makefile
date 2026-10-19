@@ -3,7 +3,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=athena-led-c
-PKG_VERSION:=0.4.1
+PKG_VERSION:=0.4.2
 PKG_LICENSE:=Apache-2.0
 PKG_MAINTAINER:=perlyz
 
