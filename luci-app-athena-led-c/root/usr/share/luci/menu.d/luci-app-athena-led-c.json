@@ -1,5 +1,5 @@
 {
-	"admin/services/athena_led_c": {
+	"admin/system/athena_led_c": {
 		"title": "Athena LED",
 		"order": 60,
 		"action": {
